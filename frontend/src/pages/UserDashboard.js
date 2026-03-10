@@ -2,6 +2,13 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import API from "../services/api";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import DashboardTab from '../components/UserDashboard/DashboardTab';
+import BookServiceTab from '../components/UserDashboard/BookServiceTab';
+import MyBookingsTab from '../components/UserDashboard/MyBookingsTab';
+import StatusTab from '../components/UserDashboard/StatusTab';
+import RemindersTab from '../components/UserDashboard/RemindersTab';
+import FeedbackTab from '../components/UserDashboard/FeedbackTab';
+
 
 /* ── Shop Location (RMK Garage) ─── */
 const SHOP_LOCATION = { lat: 13.0827, lng: 80.2707, name: "RMK Garage" };
@@ -60,6 +67,7 @@ const ICONS = {
   close: "M6 18L18 6M6 6l12 12",
   info: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
   lightning: "M13 10V3L4 14h7v7l9-11h-7z",
+  star: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.518 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.973 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.921-.755 1.688-1.538 1.118l-3.973-2.888a1 1 0 00-1.175 0l-3.973 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.973-2.888c-.783-.57-.38-1.81.588-1.81h4.915a1 1 0 00.95-.69l1.518-4.674z",
 };
 
 const ISSUE_CATEGORIES = ["Oil Change", "Brake Service", "Engine Problem", "Tire Replacement", "Battery Issue", "General Checkup"];
@@ -80,6 +88,8 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, userData, sideba
     { id: "book", label: "Book Service", icon: ICONS.book },
     { id: "bookings", label: "My Bookings", icon: ICONS.bookings },
     { id: "status", label: "Service Status", icon: ICONS.status },
+    { id: "reminders", label: "Reminders", icon: ICONS.bell },
+    { id: "feedback", label: "Feedback", icon: ICONS.star },
   ];
 
   const sidebarBg = dark ? "sidebar-dark" : "sidebar-light";
@@ -90,6 +100,7 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, userData, sideba
   const logoutStyle = dark
     ? "text-slate-500 hover:text-red-400 hover:bg-red-500/10"
     : "text-slate-400 hover:text-red-500 hover:bg-red-50";
+
 
   return (
     <>
@@ -107,9 +118,9 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, userData, sideba
         lg:translate-x-0
       `}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-6" style={{ borderBottom: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)" }}>
+        <div className="flex items-center gap-3 px-6 py-6" style={{ borderBottom: dark ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.06)" }}>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, #2563EB, #38BDF8)" }}>
+            style={{ background: "linear-gradient(135deg, #166534, #22C55E)", boxShadow: "0 4px 16px rgba(34,197,94,0.25)" }}>
             <Icon path={ICONS.lightning} className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -140,7 +151,7 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, userData, sideba
               <Icon path={item.icon} className="w-5 h-5 flex-shrink-0" />
               {item.label}
               {activeTab === item.id && (
-                <span className="ml-auto w-2 h-2 rounded-full" style={{ background: "linear-gradient(135deg, #2563EB, #38BDF8)" }} />
+                <span className="ml-auto w-2 h-2 rounded-full" style={{ background: "#22C55E", boxShadow: "0 0 8px rgba(34,197,94,0.5)" }} />
               )}
             </button>
           ))}
@@ -152,7 +163,7 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, userData, sideba
           <div className={`flex items-center gap-3 px-3 py-3 rounded-12`}
             style={{ borderRadius: 12 }}>
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #2563EB, #38BDF8)" }}>
+              style={{ background: "linear-gradient(135deg, #22C55E, #4ADE80)" }}>
               {(userData?.name || "U")[0].toUpperCase()}
             </div>
             <div className="min-w-0">
@@ -240,7 +251,7 @@ const UserDashboard = () => {
     // User marker
     if (markerRef.current) map.removeLayer(markerRef.current);
     const userIcon = L.divIcon({
-      html: `<div style="background:linear-gradient(135deg,#2563EB,#38BDF8);width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
+      html: `<div style="background:linear-gradient(135deg,#22C55E,#4ADE80);width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>
       </div>`,
       className: '', iconSize: [32, 32], iconAnchor: [16, 32]
@@ -252,7 +263,7 @@ const UserDashboard = () => {
     if (routeLineRef.current) map.removeLayer(routeLineRef.current);
     routeLineRef.current = L.polyline(
       [[SHOP_LOCATION.lat, SHOP_LOCATION.lng], [lat, lng]],
-      { color: '#2563EB', weight: 3, opacity: 0.6, dashArray: '8, 8' }
+      { color: '#22C55E', weight: 3, opacity: 0.6, dashArray: '8, 8' }
     ).addTo(map);
 
     // Fit bounds
@@ -465,6 +476,15 @@ const UserDashboard = () => {
   const labelClass = dark ? "floating-label-dark" : "floating-label-light";
   const badgeFn = (s) => getStatusBadge(s, dark);
 
+  const commonProps = {
+    dark, textPrimary, textSecondary, ICONS, cardClass, badgeFn,
+    stats, bookings, userData, setActiveTab,
+    formData, handleInputChange, handleCheckboxChange, availableSlots, handleSlotSelect,
+    handleSubmit, loading, setFormData, handleUseMyLocation, locatingUser,
+    mapContainerRef, SHOP_LOCATION, ISSUE_CATEGORIES, getMinDate, inputClass, labelClass,
+    handleCancelBooking, setRescheduleModal, activeTab
+  };
+
   return (
     <div className={`${appBg} min-h-screen flex`}>
       {/* Sidebar */}
@@ -483,8 +503,9 @@ const UserDashboard = () => {
         {/* Top Bar */}
         <header className={`sticky top-0 z-10 flex items-center justify-between px-6 py-4 ${dark ? "border-b border-white/5" : "border-b border-black/5"
           }`} style={{
-            background: dark ? "rgba(10,15,30,0.85)" : "rgba(240,244,255,0.85)",
-            backdropFilter: "blur(20px)"
+            background: dark ? "rgba(11,15,25,0.92)" : "rgba(240,244,255,0.85)",
+            backdropFilter: "blur(24px)",
+            borderBottom: dark ? '1px solid rgba(255,255,255,0.04)' : undefined,
           }}>
           <div className="flex items-center gap-4">
             {/* Hamburger */}
@@ -498,6 +519,8 @@ const UserDashboard = () => {
                 {activeTab === "book" && "Book Service"}
                 {activeTab === "bookings" && "My Bookings"}
                 {activeTab === "status" && "Service Status"}
+                {activeTab === "reminders" && "Reminders"}
+                {activeTab === "feedback" && "Feedback"}
               </h1>
               <p className={`text-xs ${textSecondary}`}>
                 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
@@ -508,9 +531,12 @@ const UserDashboard = () => {
             {/* Theme Toggle */}
             <button
               onClick={() => setDark(!dark)}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${dark ? "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-yellow-400"
-                : "bg-black/5 hover:bg-black/10 text-slate-400 hover:text-blue-600"
-                }`}
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
+              style={{
+                background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)',
+                border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
+                color: dark ? '#6B7A90' : '#94A3B8',
+              }}
             >
               <Icon path={dark ? ICONS.sun : ICONS.moon} className="w-4 h-4" />
             </button>
@@ -539,655 +565,32 @@ const UserDashboard = () => {
           )}
 
           {/* ═══════════════ DASHBOARD TAB ═══════════════ */}
-          {activeTab === "dashboard" && (
-            <div className="space-y-6 page-transition">
-              {/* Welcome */}
-              <div>
-                <h2 className={`text-2xl font-bold ${textPrimary}`}>
-                  Good morning, <span className="text-gradient">{userData?.name || "User"}</span> 👋
-                </h2>
-                <p className={`text-sm mt-1 ${textSecondary}`}>Here's an overview of your vehicle services.</p>
-              </div>
 
-              {/* Stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Total Bookings" value={stats.total} sub="All time"
-                  gradient="linear-gradient(135deg, #1D4ED8 0%, #2563EB 50%, #3B82F6 100%)"
-                  icon={ICONS.bookings} delay={0} dark={dark} />
-                <StatCard label="Pending" value={stats.pending} sub="Awaiting approval"
-                  gradient="linear-gradient(135deg, #92400E 0%, #B45309 50%, #D97706 100%)"
-                  icon={ICONS.clock} delay={80} dark={dark} />
-                <StatCard label="Confirmed" value={stats.accepted} sub="Ready to serve"
-                  gradient="linear-gradient(135deg, #065F46 0%, #059669 50%, #10B981 100%)"
-                  icon={ICONS.check} delay={160} dark={dark} />
-                <StatCard label="Rejected" value={stats.rejected} sub="Declined"
-                  gradient="linear-gradient(135deg, #7F1D1D 0%, #DC2626 50%, #EF4444 100%)"
-                  icon={ICONS.x} delay={240} dark={dark} />
-              </div>
+          <DashboardTab {...commonProps} />
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Upcoming Service */}
-                <div className={`${cardClass} p-6 lg:col-span-1`}>
-                  <div className={`flex items-center gap-2 mb-5`}>
-                    <Icon path={ICONS.calendar} className={`w-5 h-5 ${dark ? "text-blue-400" : "text-blue-600"}`} />
-                    <h3 className={`font-semibold text-sm ${textPrimary}`}>Upcoming Service</h3>
-                  </div>
-                  {bookings.filter(b => b.status === "Accepted").length > 0 ? (() => {
-                    const next = bookings.filter(b => b.status === "Accepted")[0];
-                    return (
-                      <div>
-                        <div className="w-14 h-14 rounded-2xl flex items-center justify-center mb-4"
-                          style={{ background: "linear-gradient(135deg, #2563EB, #38BDF8)" }}>
-                          <Icon path={ICONS.car} className="w-7 h-7 text-white" />
-                        </div>
-                        <div className={`font-bold text-lg ${textPrimary} mb-1`}>{next.vehicleNumber}</div>
-                        <div className={`text-xs ${textSecondary} flex items-center gap-1 mb-1`}>
-                          <Icon path={ICONS.calendar} className="w-3 h-3" /> {next.serviceDate}
-                        </div>
-                        <div className={`text-xs ${textSecondary} flex items-center gap-1 mb-3`}>
-                          <Icon path={ICONS.clock} className="w-3 h-3" /> {next.serviceTime}
-                        </div>
-                        <span className="badge-accepted">Confirmed</span>
-                      </div>
-                    );
-                  })() : (
-                    <div className={`text-center py-8 ${textSecondary}`}>
-                      <Icon path={ICONS.calendar} className={`w-12 h-12 mx-auto mb-3 opacity-30`} />
-                      <p className="text-sm">No upcoming services</p>
-                      <button onClick={() => setActiveTab("book")}
-                        className={`mt-3 text-xs font-medium ${dark ? "text-blue-400" : "text-blue-600"} hover:underline`}>
-                        Book one now →
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Quick Actions */}
-                <div className={`${cardClass} p-6`}>
-                  <div className={`flex items-center gap-2 mb-5`}>
-                    <Icon path={ICONS.lightning} className={`w-5 h-5 ${dark ? "text-blue-400" : "text-blue-600"}`} />
-                    <h3 className={`font-semibold text-sm ${textPrimary}`}>Quick Actions</h3>
-                  </div>
-                  <div className="space-y-3">
-                    {[
-                      { label: "Book New Service", sub: "Schedule an appointment", icon: ICONS.book, tab: "book", color: "#2563EB" },
-                      { label: "View My Bookings", sub: "Manage existing ones", icon: ICONS.bookings, tab: "bookings", color: "#10B981" },
-                      { label: "Check Status", sub: "Track your services", icon: ICONS.status, tab: "status", color: "#F59E0B" },
-                    ].map(item => (
-                      <button key={item.tab} onClick={() => setActiveTab(item.tab)}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${dark ? "hover:bg-white/5" : "hover:bg-blue-50"
-                          }`}>
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: `${item.color}20` }}>
-                          <Icon path={item.icon} className="w-4 h-4" style={{ color: item.color }} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className={`text-sm font-medium ${textPrimary}`}>{item.label}</div>
-                          <div className={`text-xs ${textSecondary}`}>{item.sub}</div>
-                        </div>
-                        <Icon path={ICONS.chevronRight} className={`w-4 h-4 ml-auto flex-shrink-0 ${textSecondary}`} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Recent Activity */}
-                <div className={`${cardClass} p-6`}>
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2">
-                      <Icon path={ICONS.clock} className={`w-5 h-5 ${dark ? "text-blue-400" : "text-blue-600"}`} />
-                      <h3 className={`font-semibold text-sm ${textPrimary}`}>Recent Activity</h3>
-                    </div>
-                    <button onClick={() => setActiveTab("bookings")}
-                      className={`text-xs ${dark ? "text-blue-400" : "text-blue-600"} hover:underline`}>
-                      View all
-                    </button>
-                  </div>
-                  {bookings.length === 0 ? (
-                    <div className={`text-center py-8 ${textSecondary}`}>
-                      <Icon path={ICONS.info} className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">No activity yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {bookings.slice(0, 4).map(b => (
-                        <div key={b._id} className={`flex items-center gap-3 p-2 rounded-xl transition-all ${dark ? "hover:bg-white/5" : "hover:bg-slate-50"
-                          }`}>
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{
-                              background: b.status === "Pending" ? "rgba(234,179,8,0.15)"
-                                : b.status === "Accepted" ? "rgba(34,197,94,0.15)"
-                                  : "rgba(239,68,68,0.15)"
-                            }}>
-                            <Icon path={ICONS.car} className="w-4 h-4"
-                              style={{ color: b.status === "Pending" ? "#EAB308" : b.status === "Accepted" ? "#22C55E" : "#EF4444" }} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className={`text-sm font-medium truncate ${textPrimary}`}>{b.vehicleNumber}</div>
-                            <div className={`text-xs ${textSecondary}`}>{b.serviceDate}</div>
-                          </div>
-                          <span className={badgeFn(b.status)}>{b.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* ═══════════════ BOOK SERVICE TAB ═══════════════ */}
-          {activeTab === "book" && (
-            <div className="max-w-2xl mx-auto page-transition">
-              <div className={`${cardClass}`} style={{ overflow: "hidden" }}>
-                {/* Card Header */}
-                <div className="px-6 py-5" style={{ background: "linear-gradient(135deg, #2563EB, #1D4ED8)" }}>
-                  <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                    <Icon path={ICONS.book} className="w-5 h-5 text-blue-200" />
-                    Book a Service Slot
-                  </h2>
-                  <p className="text-blue-200 text-xs mt-1">Fill in details to schedule your vehicle service</p>
-                </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-5">
-                  {/* Vehicle Number */}
-                  <div className="floating-group">
-                    <input
-                      type="text" name="vehicleNumber" id="vehicleNumber"
-                      placeholder=" "
-                      className={`${inputClass} w-full px-4 text-sm`}
-                      value={formData.vehicleNumber}
-                      onChange={handleInputChange}
-                      required disabled={loading}
-                    />
-                    <label htmlFor="vehicleNumber" className={`floating-label ${labelClass}`}>
-                      Vehicle Number (e.g. TN01AB1234)
-                    </label>
-                  </div>
+          <BookServiceTab {...commonProps} />
 
-                  {/* Service Issue */}
-                  <div className="floating-group">
-                    <textarea
-                      name="issue" id="issue"
-                      rows={3}
-                      placeholder=" "
-                      className={`${inputClass} w-full px-4 resize-none text-sm`}
-                      value={formData.issue}
-                      onChange={handleInputChange}
-                      disabled={loading}
-                    />
-                    <label htmlFor="issue" className={`floating-label ${labelClass}`}>
-                      Describe the Issue / Service Needed
-                    </label>
-                  </div>
-
-                  {/* Service Categories */}
-                  <div>
-                    <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>
-                      Service Type (Optional)
-                    </div>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {ISSUE_CATEGORIES.map(cat => {
-                        const checked = formData.issueCategories.includes(cat);
-                        return (
-                          <label key={cat}
-                            className={`flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer text-xs font-medium transition-all ${checked
-                              ? dark ? "bg-blue-600/20 border border-blue-500/50 text-blue-300" : "bg-blue-50 border border-blue-300 text-blue-700"
-                              : dark ? "border border-white/8 text-slate-400 hover:border-blue-500/30" : "border border-slate-200 text-slate-500 hover:border-blue-300"
-                              }`}
-                            style={{ border: checked ? undefined : dark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #E2E8F0" }}>
-                            <input type="checkbox" className="hidden"
-                              checked={checked}
-                              onChange={() => handleCheckboxChange(cat)}
-                              disabled={loading}
-                            />
-                            <span className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all ${checked
-                              ? "bg-blue-500"
-                              : dark ? "bg-white/10" : "bg-slate-100"
-                              }`}>
-                              {checked && <Icon path={ICONS.check} className="w-2.5 h-2.5 text-white" />}
-                            </span>
-                            {cat}
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Date & Time */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div className="floating-group">
-                      <input
-                        type="date" name="serviceDate" id="serviceDate"
-                        placeholder=" "
-                        className={`${inputClass} w-full px-4 text-sm`}
-                        value={formData.serviceDate}
-                        onChange={handleInputChange}
-                        min={getMinDate()}
-                        required disabled={loading}
-                      />
-                      <label htmlFor="serviceDate" className={`floating-label ${labelClass}`}>Service Date</label>
-                    </div>
-
-                    {/* Time Slot selector */}
-                    {!formData.serviceDate ? (
-                      <div className={`flex items-center justify-center rounded-xl text-xs ${textSecondary} border ${dark ? "border-white/8" : "border-slate-200"}`}
-                        style={{ minHeight: 60, borderStyle: "dashed" }}>
-                        Select a date first
-                      </div>
-                    ) : availableSlots.length > 0 ? (
-                      <div>
-                        <div className={`text-xs font-semibold uppercase tracking-widest mb-2 ${textSecondary}`}>Time Slot</div>
-                        <div className="grid grid-cols-3 gap-1.5">
-                          {availableSlots.map((slot, i) => {
-                            const full = slot.available === 0;
-                            const selected = formData.serviceTime === slot.time;
-                            return (
-                              <button key={i} type="button"
-                                onClick={() => !full && handleSlotSelect(slot)}
-                                className={`py-2 rounded-lg text-xs font-semibold transition-all ${full ? "opacity-40 cursor-not-allowed"
-                                  : selected ? "text-white shadow-lg scale-105"
-                                    : dark ? "border border-white/10 text-slate-300 hover:border-blue-500/50 hover:text-blue-300"
-                                      : "border border-slate-200 text-slate-600 hover:border-blue-400 hover:text-blue-600"
-                                  }`}
-                                style={selected ? { background: "linear-gradient(135deg, #2563EB, #38BDF8)" } : {}}
-                              >
-                                {slot.time}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="floating-group">
-                        <input
-                          type="time" name="serviceTime" id="serviceTime"
-                          placeholder=" "
-                          className={`${inputClass} w-full px-4 text-sm`}
-                          value={formData.serviceTime}
-                          onChange={handleInputChange}
-                          required disabled={loading}
-                        />
-                        <label htmlFor="serviceTime" className={`floating-label ${labelClass}`}>Service Time</label>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* ── Doorstep Pickup & Delivery Toggle ── */}
-                  {formData.serviceDate && (
-                    <div className={`rounded-2xl transition-all duration-300 animate-fadeIn overflow-hidden`}
-                      style={{
-                        background: formData.doorstepDelivery
-                          ? dark ? 'linear-gradient(135deg, rgba(37,99,235,0.15), rgba(56,189,248,0.1))' : 'linear-gradient(135deg, rgba(37,99,235,0.08), rgba(56,189,248,0.05))'
-                          : dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)',
-                        border: formData.doorstepDelivery
-                          ? dark ? '1px solid rgba(37,99,235,0.4)' : '1px solid rgba(37,99,235,0.3)'
-                          : dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)',
-                      }}
-                    >
-                      {/* Toggle Header */}
-                      <div className="flex items-center justify-between p-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{
-                              background: formData.doorstepDelivery
-                                ? 'linear-gradient(135deg, #2563EB, #38BDF8)'
-                                : dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'
-                            }}>
-                            <Icon path={ICONS.mapPin}
-                              className={`w-5 h-5 transition-colors ${formData.doorstepDelivery ? 'text-white' : dark ? 'text-slate-500' : 'text-slate-400'}`} />
-                          </div>
-                          <div>
-                            <div className={`text-sm font-semibold ${textPrimary}`}>
-                              Doorstep Pickup & Delivery
-                            </div>
-                            <div className={`text-xs mt-0.5 ${textSecondary}`}>
-                              We'll pick up your bike & deliver it back after service
-                            </div>
-                          </div>
-                        </div>
-                        {/* Toggle Switch */}
-                        <button
-                          type="button"
-                          onClick={() => setFormData(p => ({
-                            ...p,
-                            doorstepDelivery: !p.doorstepDelivery,
-                            ...(!p.doorstepDelivery ? {} : { pickupLocation: null, doorstepCharge: 0, distanceKm: 0 })
-                          }))}
-                          disabled={loading}
-                          className="relative flex-shrink-0 ml-3 transition-all duration-300 focus:outline-none"
-                          style={{
-                            width: 48, height: 26, borderRadius: 13,
-                            background: formData.doorstepDelivery
-                              ? 'linear-gradient(135deg, #2563EB, #38BDF8)'
-                              : dark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.15)',
-                            cursor: loading ? 'not-allowed' : 'pointer'
-                          }}
-                        >
-                          <span
-                            className="block rounded-full shadow-lg transition-all duration-300"
-                            style={{
-                              width: 20, height: 20,
-                              marginTop: 3,
-                              marginLeft: formData.doorstepDelivery ? 25 : 3,
-                              background: '#FFFFFF',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.2)'
-                            }}
-                          />
-                        </button>
-                      </div>
-
-                      {/* ── Map & Pricing Panel ── */}
-                      {formData.doorstepDelivery && (
-                        <div className="animate-fadeIn">
-                          {/* Action Buttons */}
-                          <div className="px-5 pb-3 flex flex-wrap gap-2">
-                            <button type="button" onClick={handleUseMyLocation} disabled={locatingUser}
-                              className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all"
-                              style={{
-                                background: 'linear-gradient(135deg, #2563EB, #38BDF8)',
-                                color: '#fff', opacity: locatingUser ? 0.7 : 1,
-                                cursor: locatingUser ? 'wait' : 'pointer'
-                              }}>
-                              {locatingUser ? (
-                                <><svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                </svg> Locating...</>
-                              ) : (
-                                <><Icon path={ICONS.mapPin} className="w-3.5 h-3.5" /> Use My Location</>
-                              )}
-                            </button>
-                            <div className={`flex items-center gap-1 text-xs ${textSecondary}`}>
-                              <Icon path={ICONS.info} className="w-3 h-3" />
-                              or click on the map to set pickup point
-                            </div>
-                          </div>
-
-                          {/* Map Container */}
-                          <div className="px-5 pb-4">
-                            <div style={{
-                              borderRadius: 16, overflow: 'hidden', height: 280,
-                              border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)'
-                            }}>
-                              <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
-                            </div>
-                          </div>
-
-                          {/* Location & Pricing Info */}
-                          {formData.pickupLocation && (
-                            <div className="px-5 pb-5 space-y-3 animate-fadeIn">
-                              {/* Selected Address */}
-                              <div className={`rounded-xl p-3`} style={{
-                                background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                                border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
-                              }}>
-                                <div className={`text-xs font-semibold uppercase tracking-widest mb-1.5 ${textSecondary}`}>Pickup Address</div>
-                                <p className={`text-xs leading-relaxed ${textPrimary}`}>
-                                  {formData.pickupLocation.address?.substring(0, 120)}{formData.pickupLocation.address?.length > 120 ? '...' : ''}
-                                </p>
-                              </div>
-
-                              {/* Distance & Pricing Card */}
-                              <div className="rounded-xl overflow-hidden" style={{
-                                background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-                                border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
-                              }}>
-                                <div className="p-3 grid grid-cols-3 gap-3">
-                                  {/* Distance */}
-                                  <div className="text-center">
-                                    <div className={`text-lg font-black ${dark ? 'text-blue-400' : 'text-blue-600'}`}>
-                                      {formData.distanceKm} <span className="text-xs font-semibold">km</span>
-                                    </div>
-                                    <div className={`text-xs ${textSecondary}`}>Distance</div>
-                                  </div>
-                                  {/* Charge */}
-                                  <div className="text-center" style={{ borderLeft: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', borderRight: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)' }}>
-                                    <div className={`text-lg font-black ${dark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                                      ₹{formData.doorstepCharge}
-                                    </div>
-                                    <div className={`text-xs ${textSecondary}`}>Delivery Fee</div>
-                                  </div>
-                                  {/* Navigate */}
-                                  <div className="text-center flex flex-col items-center justify-center">
-                                    <a
-                                      href={`https://www.google.com/maps/dir/${SHOP_LOCATION.lat},${SHOP_LOCATION.lng}/${formData.pickupLocation.lat},${formData.pickupLocation.lng}`}
-                                      target="_blank" rel="noopener noreferrer"
-                                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
-                                      style={{ background: 'linear-gradient(135deg, #059669, #10B981)' }}>
-                                      <Icon path={ICONS.mapPin} className="w-3 h-3" /> Navigate
-                                    </a>
-                                  </div>
-                                </div>
-
-                                {/* Pricing Breakdown */}
-                                <div className="px-3 pb-3">
-                                  <div className={`rounded-lg p-2.5 text-xs leading-relaxed ${dark ? 'bg-white/5 text-slate-400' : 'bg-slate-50 text-slate-500'}`}>
-                                    {formData.distanceKm <= 10 ? (
-                                      <div className="flex items-center gap-2">
-                                        <Icon path={ICONS.check} className={`w-3.5 h-3.5 flex-shrink-0 ${dark ? 'text-emerald-400' : 'text-emerald-500'}`} />
-                                        <span>Within 10 km — Flat rate <strong className={dark ? 'text-emerald-400' : 'text-emerald-600'}>₹100</strong></span>
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                          <Icon path={ICONS.info} className={`w-3.5 h-3.5 flex-shrink-0 ${dark ? 'text-blue-400' : 'text-blue-500'}`} />
-                                          <span>Base charge (first 10 km): <strong>₹100</strong></span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                          <Icon path={ICONS.plus} className={`w-3.5 h-3.5 flex-shrink-0 ${dark ? 'text-blue-400' : 'text-blue-500'}`} />
-                                          <span>Extra {Math.ceil(formData.distanceKm - 10)} km × ₹10 = <strong>₹{Math.ceil(formData.distanceKm - 10) * 10}</strong></span>
-                                        </div>
-                                        <div className="flex items-center gap-2 pt-1" style={{ borderTop: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)' }}>
-                                          <Icon path={ICONS.check} className={`w-3.5 h-3.5 flex-shrink-0 ${dark ? 'text-emerald-400' : 'text-emerald-500'}`} />
-                                          <span>Total delivery fee: <strong className={dark ? 'text-emerald-400' : 'text-emerald-600'}>₹{formData.doorstepCharge}</strong></span>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
-                    {loading ? (
-                      <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>Processing...</>
-                    ) : (
-                      <><Icon path={ICONS.check} className="w-4 h-4" />Submit Booking</>
-                    )}
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
 
           {/* ═══════════════ MY BOOKINGS TAB ═══════════════ */}
-          {activeTab === "bookings" && (
-            <div className="page-transition">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className={`text-xl font-bold ${textPrimary}`}>My Bookings</h2>
-                  <p className={`text-sm ${textSecondary}`}>{bookings.length} total bookings</p>
-                </div>
-                <button onClick={() => setActiveTab("book")} className="btn-primary flex items-center gap-2 py-2 px-4 text-sm">
-                  <Icon path={ICONS.plus} className="w-4 h-4" /> New Booking
-                </button>
-              </div>
 
-              {bookings.length === 0 ? (
-                <div className={`${cardClass} p-16 text-center`}>
-                  <div className="w-16 h-16 rounded-3xl flex items-center justify-center mx-auto mb-4"
-                    style={{ background: "rgba(37,99,235,0.1)" }}>
-                    <Icon path={ICONS.bookings} className={`w-8 h-8 ${dark ? "text-blue-400" : "text-blue-500"}`} />
-                  </div>
-                  <h3 className={`font-semibold mb-2 ${textPrimary}`}>No bookings yet</h3>
-                  <p className={`text-sm ${textSecondary} mb-4`}>Book your first service slot</p>
-                  <button onClick={() => setActiveTab("book")} className="btn-primary py-2 px-6 text-sm">Book Now</button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {bookings.map(b => (
-                    <div key={b._id} className={`${cardClass} overflow-hidden`}>
-                      {/* Status bar */}
-                      <div className="h-1" style={{
-                        background: b.status === "Pending" ? "linear-gradient(90deg, #EAB308, #FCD34D)"
-                          : b.status === "Accepted" ? "linear-gradient(90deg, #22C55E, #86EFAC)"
-                            : "linear-gradient(90deg, #EF4444, #FCA5A5)"
-                      }} />
-                      <div className="p-5">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="font-mono font-bold text-base" style={{
-                            background: dark ? "rgba(255,255,255,0.05)" : "#F0F4FF",
-                            border: dark ? "1px solid rgba(255,255,255,0.08)" : "1px solid #BFDBFE",
-                            padding: "4px 10px", borderRadius: 8, color: dark ? "#93C5FD" : "#1D4ED8"
-                          }}>{b.vehicleNumber}</div>
-                          <span className={badgeFn(b.status)}>{b.status}</span>
-                        </div>
-                        <div className="space-y-2 mb-4">
-                          <div className={`flex items-center gap-2 text-xs ${textSecondary}`}>
-                            <Icon path={ICONS.calendar} className="w-3.5 h-3.5" /> {b.serviceDate}
-                          </div>
-                          <div className={`flex items-center gap-2 text-xs ${textSecondary}`}>
-                            <Icon path={ICONS.clock} className="w-3.5 h-3.5" /> {b.serviceTime}
-                          </div>
-                        </div>
-                        {(b.doorstepDelivery || b.pickupLocation?.lat) && (
-                          <div className={`rounded-lg p-2.5 mb-3`} style={{
-                            background: dark ? 'rgba(37,99,235,0.08)' : 'rgba(37,99,235,0.05)',
-                            border: dark ? '1px solid rgba(37,99,235,0.2)' : '1px solid rgba(37,99,235,0.15)'
-                          }}>
-                            <div className={`flex items-center gap-2 text-xs font-semibold mb-1.5 ${dark ? 'text-blue-400' : 'text-blue-600'}`}>
-                              <Icon path={ICONS.mapPin} className="w-3.5 h-3.5" /> Doorstep Pickup & Delivery
-                            </div>
-                            <div className="flex items-center gap-3 text-xs">
-                              <span className={textSecondary}>
-                                {b.distanceKm ? `${b.distanceKm} km` : '—'}
-                              </span>
-                              <span className={`font-bold ${dark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                                {b.doorstepCharge ? `₹${b.doorstepCharge}` : '₹100'}
-                              </span>
-                              {b.pickupLocation?.lat && (
-                                <a
-                                  href={`https://www.google.com/maps/dir/${SHOP_LOCATION.lat},${SHOP_LOCATION.lng}/${b.pickupLocation.lat},${b.pickupLocation.lng}`}
-                                  target="_blank" rel="noopener noreferrer"
-                                  className="ml-auto flex items-center gap-1 px-2 py-1 rounded-md text-xs font-semibold text-white"
-                                  style={{ background: 'linear-gradient(135deg, #059669, #10B981)' }}>
-                                  <Icon path={ICONS.mapPin} className="w-3 h-3" /> Navigate
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                        {b.issueCategories?.length > 0 && (
-                          <div className="flex flex-wrap gap-1.5 mb-3">
-                            {b.issueCategories.map((c, i) => (
-                              <span key={i} className="text-xs px-2 py-0.5 rounded-full"
-                                style={{
-                                  background: dark ? "rgba(37,99,235,0.15)" : "#DBEAFE",
-                                  color: dark ? "#93C5FD" : "#1D4ED8",
-                                  border: dark ? "1px solid rgba(37,99,235,0.3)" : "1px solid #BFDBFE"
-                                }}>{c}</span>
-                            ))}
-                          </div>
-                        )}
-                        {b.status === "Pending" && (
-                          <div className="flex gap-2 mt-3">
-                            <button
-                              onClick={() => setRescheduleModal({ isOpen: true, booking: b, newDate: b.serviceDate, newTime: b.serviceTime })}
-                              className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${dark ? "border border-blue-500/40 text-blue-400 hover:bg-blue-500/10" : "border border-blue-300 text-blue-600 hover:bg-blue-50"
-                                }`}>
-                              Reschedule
-                            </button>
-                            <button onClick={() => handleCancelBooking(b._id)}
-                              className={`flex-1 py-2 rounded-xl text-xs font-semibold transition-all ${dark ? "border border-red-500/40 text-red-400 hover:bg-red-500/10" : "border border-red-300 text-red-600 hover:bg-red-50"
-                                }`}>
-                              Cancel
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+          <MyBookingsTab {...commonProps} />
+
 
           {/* ═══════════════ STATUS TAB ═══════════════ */}
-          {activeTab === "status" && (
-            <div className="page-transition">
-              <div className="mb-6">
-                <h2 className={`text-xl font-bold ${textPrimary}`}>Service Status</h2>
-                <p className={`text-sm ${textSecondary}`}>Track your booking statuses</p>
-              </div>
 
-              <div className={`${cardClass} overflow-hidden`}>
-                {bookings.length === 0 ? (
-                  <div className="p-16 text-center">
-                    <Icon path={ICONS.status} className={`w-12 h-12 mx-auto mb-3 ${dark ? "text-slate-600" : "text-slate-300"}`} />
-                    <p className={textSecondary}>No bookings to show</p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <table className={`w-full ${dark ? "table-dark" : "table-light"}`}>
-                      <thead>
-                        <tr>
-                          <th className="text-left">Booking ID</th>
-                          <th className="text-left">Vehicle Number</th>
-                          <th className="text-left">Service Date</th>
-                          <th className="text-left">Time</th>
-                          <th className="text-left">Doorstep</th>
-                          <th className="text-left">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {bookings.map(b => (
-                          <tr key={b._id}>
-                            <td className={`font-mono text-xs ${dark ? "text-slate-500" : "text-slate-400"}`}>
-                              #{b._id?.slice(-6).toUpperCase()}
-                            </td>
-                            <td>
-                              <span className="font-semibold" style={{ color: dark ? "#93C5FD" : "#2563EB" }}>{b.vehicleNumber}</span>
-                            </td>
-                            <td>{b.serviceDate}</td>
-                            <td>{b.serviceTime}</td>
-                            <td>
-                              {(b.doorstepDelivery || b.pickupLocation?.lat) ? (
-                                <div className="flex flex-col gap-1">
-                                  <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full w-fit"
-                                    style={{
-                                      background: dark ? 'rgba(37,99,235,0.15)' : '#DBEAFE',
-                                      color: dark ? '#93C5FD' : '#1D4ED8',
-                                      border: dark ? '1px solid rgba(37,99,235,0.3)' : '1px solid #BFDBFE'
-                                    }}>
-                                    <Icon path={ICONS.mapPin} className="w-3 h-3" /> {b.distanceKm ? `${b.distanceKm} km` : 'Yes'}
-                                  </span>
-                                  <span className={`text-xs font-bold ${dark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                                    {b.doorstepCharge ? `₹${b.doorstepCharge}` : '₹100'}
-                                  </span>
-                                </div>
-                              ) : (
-                                <span className={`text-xs ${dark ? 'text-slate-600' : 'text-slate-400'}`}>No</span>
-                              )}
-                            </td>
-                            <td><span className={badgeFn(b.status)}>{b.status}</span></td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          <StatusTab {...commonProps} />
+
+          {/* ═══════════════ REMINDERS TAB ═══════════════ */}
+
+          <RemindersTab {...commonProps} />
+
+          {/* ═══════════════ FEEDBACK TAB ═══════════════ */}
+
+          <FeedbackTab {...commonProps} />
+
         </main>
       </div>
 
@@ -1201,7 +604,7 @@ const UserDashboard = () => {
               <h3 className={`font-bold text-lg mb-4 ${textPrimary}`}>Reschedule Booking</h3>
               <div className="space-y-4">
                 <div className="floating-group">
-                  <input type="date" id="rDate" placeholder=" "
+                  <input type="date" id="rDate" lang="en-GB" placeholder=" "
                     className={`${inputClass} w-full px-4 text-sm`}
                     value={rescheduleModal.newDate}
                     onChange={e => setRescheduleModal(p => ({ ...p, newDate: e.target.value }))}

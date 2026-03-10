@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -6,7 +8,7 @@ const session = require("express-session");
 // Routes
 const authRoutes = require("./routes/authRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
-const adminRoutes = require("./routes/adminroutes");
+const adminRoutes = require("./routes/adminRoutes");
 
 const app = express();
 
@@ -30,9 +32,6 @@ app.use(
 );
 
 // ================= MONGODB CONNECTION =================
-require("dotenv").config();
-
-// ================= MONGODB CONNECTION =================
 mongoose.connect(process.env.MONGO_URI)
   .then(() => console.log("MongoDB Connected"))
   .catch(err => console.log(err));
@@ -48,6 +47,7 @@ app.get("/", (req, res) => {
 });
 
 // ================= SERVER START =================
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
 });

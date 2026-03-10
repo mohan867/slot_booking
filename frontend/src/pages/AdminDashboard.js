@@ -2,6 +2,10 @@ import React, { useEffect, useState, useRef, useCallback } from "react";
 import API from "../services/api";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import AdminDashboardTab from '../components/AdminDashboard/AdminDashboardTab';
+import AdminBookingsTab from '../components/AdminDashboard/AdminBookingsTab';
+import AdminUsersTab from '../components/AdminDashboard/AdminUsersTab';
+
 
 /* ── Shop Location (RMK Garage) ─── */
 const SHOP_LOCATION = { lat: 13.0827, lng: 80.2707, name: "RMK Garage" };
@@ -71,6 +75,7 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
   const logoutStyle = dark
     ? "text-slate-500 hover:text-red-400 hover:bg-red-500/10"
     : "text-slate-400 hover:text-red-500 hover:bg-red-50";
+
 
   return (
     <>
@@ -230,7 +235,7 @@ const AdminDashboard = () => {
 
       // User marker
       const userIcon = L.divIcon({
-        html: `<div style="background:linear-gradient(135deg,#2563EB,#38BDF8);width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center">
+        html: `<div style="background:linear-gradient(135deg,#22C55E,#4ADE80);width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>
         </div>`,
         className: '', iconSize: [36, 36], iconAnchor: [18, 36]
@@ -242,7 +247,7 @@ const AdminDashboard = () => {
       // Route line
       L.polyline(
         [[SHOP_LOCATION.lat, SHOP_LOCATION.lng], [userLat, userLng]],
-        { color: '#2563EB', weight: 3, opacity: 0.6, dashArray: '8, 8' }
+        { color: '#22C55E', weight: 3, opacity: 0.6, dashArray: '8, 8' }
       ).addTo(map);
 
       // Fit bounds
@@ -321,6 +326,14 @@ const AdminDashboard = () => {
     return `text-white border-transparent`;
   };
 
+  const adminCommonProps = {
+    dark, textPrimary, textSecondary, cardClass, badgeFn, filterChip,
+    stats, bookings, filteredBookings, uniqueUsers,
+    loading, fetchBookings, filterStatus, setFilterStatus,
+    setActiveTab, setSelectedBooking, setSelectedUser,
+    ICONS, SHOP_LOCATION,
+  };
+
   return (
     <div className={`${dark ? "bg-app-dark" : "bg-app-light"} min-h-screen flex`}>
       {/* Sidebar */}
@@ -366,7 +379,7 @@ const AdminDashboard = () => {
             </button>
             <button onClick={() => setDark(!dark)}
               className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${dark ? "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-yellow-400"
-                : "bg-black/5 hover:bg-black/10 text-slate-400 hover:text-blue-600"
+                : "bg-black/5 hover:bg-black/10 text-slate-400 hover:text-green-600"
                 }`}>
               <Icon path={dark ? ICONS.sun : ICONS.moon} className="w-4 h-4" />
             </button>
@@ -385,312 +398,15 @@ const AdminDashboard = () => {
         {/* Page */}
         <main className="flex-1 px-4 sm:px-6 py-6">
 
+
           {/* ══════ DASHBOARD ══════ */}
-          {activeTab === "dashboard" && (
-            <div className="space-y-6 page-transition">
-              <div>
-                <h2 className={`text-2xl font-bold ${textPrimary}`}>Overview</h2>
-                <p className={`text-sm mt-1 ${textSecondary}`}>Complete booking system analytics</p>
-              </div>
-
-              {/* Stats */}
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <StatCard label="Total Bookings" value={stats.total} sub="All time"
-                  gradient="linear-gradient(135deg, #4C1D95 0%, #6D28D9 50%, #7C3AED 100%)"
-                  icon={ICONS.bookings} delay={0} />
-                <StatCard label="Pending" value={stats.pending} sub="Needs action"
-                  gradient="linear-gradient(135deg, #92400E 0%, #B45309 50%, #D97706 100%)"
-                  icon={ICONS.clock} delay={80} />
-                <StatCard label="Accepted" value={stats.accepted} sub="Confirmed slots"
-                  gradient="linear-gradient(135deg, #065F46 0%, #059669 50%, #10B981 100%)"
-                  icon={ICONS.check} delay={160} />
-                <StatCard label="Rejected" value={stats.rejected} sub="Declined"
-                  gradient="linear-gradient(135deg, #7F1D1D 0%, #DC2626 50%, #EF4444 100%)"
-                  icon={ICONS.x} delay={240} />
-              </div>
-
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Booking Progress */}
-                <div className={`${cardClass} p-6 lg:col-span-1`}>
-                  <div className="flex items-center gap-2 mb-5">
-                    <Icon path={ICONS.info} className={`w-5 h-5 ${dark ? "text-violet-400" : "text-violet-600"}`} />
-                    <h3 className={`font-semibold text-sm ${textPrimary}`}>Status Overview</h3>
-                  </div>
-                  {stats.total === 0 ? (
-                    <p className={`text-sm ${textSecondary}`}>No data yet</p>
-                  ) : (
-                    <div className="space-y-5">
-                      {[
-                        { label: "Pending", val: stats.pending, color: "#EAB308", bg: "rgba(234,179,8,0.15)" },
-                        { label: "Accepted", val: stats.accepted, color: "#22C55E", bg: "rgba(34,197,94,0.15)" },
-                        { label: "Rejected", val: stats.rejected, color: "#EF4444", bg: "rgba(239,68,68,0.15)" },
-                      ].map(item => (
-                        <div key={item.label}>
-                          <div className="flex justify-between text-xs mb-2">
-                            <span className={textSecondary}>{item.label}</span>
-                            <span className="font-bold" style={{ color: item.color }}>
-                              {item.val} ({stats.total > 0 ? Math.round((item.val / stats.total) * 100) : 0}%)
-                            </span>
-                          </div>
-                          <div className="progress-bar">
-                            <div className="progress-fill" style={{
-                              width: `${stats.total > 0 ? (item.val / stats.total) * 100 : 0}%`,
-                              background: `linear-gradient(90deg, ${item.color}, ${item.bg})`
-                            }} />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Quick Actions */}
-                <div className={`${cardClass} p-6`}>
-                  <div className="flex items-center gap-2 mb-5">
-                    <Icon path={ICONS.lightning} className={`w-5 h-5 ${dark ? "text-violet-400" : "text-violet-600"}`} />
-                    <h3 className={`font-semibold text-sm ${textPrimary}`}>Quick Actions</h3>
-                  </div>
-                  <div className="space-y-3">
-                    {[
-                      { label: "Review All Bookings", sub: "Manage requests", icon: ICONS.bookings, tab: "bookings", filter: "All", color: "#7C3AED" },
-                      { label: `Review Pending (${stats.pending})`, sub: "Action required", icon: ICONS.clock, tab: "bookings", filter: "Pending", color: "#EAB308" },
-                      { label: "Manage Users", sub: `${uniqueUsers.length} registered users`, icon: ICONS.users, tab: "users", filter: null, color: "#10B981" },
-                    ].map(item => (
-                      <button key={item.label} onClick={() => { setActiveTab(item.tab); if (item.filter) setFilterStatus(item.filter); }}
-                        className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-all ${dark ? "hover:bg-white/5" : "hover:bg-slate-50"}`}>
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: `${item.color}20` }}>
-                          <Icon path={item.icon} className="w-4 h-4" style={{ color: item.color }} />
-                        </div>
-                        <div className="min-w-0">
-                          <div className={`text-sm font-medium ${textPrimary}`}>{item.label}</div>
-                          <div className={`text-xs ${textSecondary}`}>{item.sub}</div>
-                        </div>
-                        <Icon path={ICONS.chevronRight} className={`w-4 h-4 ml-auto flex-shrink-0 ${textSecondary}`} />
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Recent Bookings */}
-                <div className={`${cardClass} p-6`}>
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2">
-                      <Icon path={ICONS.clock} className={`w-5 h-5 ${dark ? "text-violet-400" : "text-violet-600"}`} />
-                      <h3 className={`font-semibold text-sm ${textPrimary}`}>Recent Bookings</h3>
-                    </div>
-                    <button onClick={() => setActiveTab("bookings")}
-                      className={`text-xs ${dark ? "text-violet-400" : "text-violet-600"} hover:underline`}>
-                      View all
-                    </button>
-                  </div>
-                  {bookings.length === 0 ? (
-                    <div className={`text-center py-8 ${textSecondary}`}>
-                      <Icon path={ICONS.bookings} className="w-10 h-10 mx-auto mb-2 opacity-30" />
-                      <p className="text-sm">No bookings yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {bookings.slice(0, 5).map(b => (
-                        <div key={b._id} className={`flex items-center gap-3 p-2 rounded-xl transition-all ${dark ? "hover:bg-white/5" : "hover:bg-slate-50"}`}>
-                          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                            style={{ background: "rgba(124,58,237,0.15)" }}>
-                            <Icon path={ICONS.user} className="w-4 h-4" style={{ color: "#A78BFA" }} />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className={`text-sm font-medium truncate ${textPrimary}`}>{b.userId?.name || "Customer"}</div>
-                            <div className={`text-xs ${textSecondary}`}>{b.vehicleNumber} · {b.serviceDate}</div>
-                          </div>
-                          <span className={badgeFn(b.status)}>{b.status}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+          {activeTab === "dashboard" && <AdminDashboardTab {...adminCommonProps} />}
 
           {/* ══════ ALL BOOKINGS ══════ */}
-          {activeTab === "bookings" && (
-            <div className="page-transition">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div>
-                  <h2 className={`text-xl font-bold ${textPrimary}`}>Booking Management</h2>
-                  <p className={`text-sm ${textSecondary}`}>{filteredBookings.length} of {stats.total} bookings</p>
-                </div>
-                <button onClick={fetchBookings}
-                  className="flex items-center gap-2 btn-primary py-2 px-4 text-sm"
-                  style={{ background: "linear-gradient(135deg, #7C3AED, #4F46E5)" }}>
-                  <Icon path={ICONS.refresh} className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                  Refresh
-                </button>
-              </div>
-
-              {/* Filter chips */}
-              <div className="flex flex-wrap gap-2 mb-4">
-                {[
-                  { label: "All", count: stats.total, grad: "linear-gradient(135deg,#7C3AED,#4F46E5)" },
-                  { label: "Pending", count: stats.pending, grad: "linear-gradient(135deg,#B45309,#D97706)" },
-                  { label: "Accepted", count: stats.accepted, grad: "linear-gradient(135deg,#065F46,#059669)" },
-                  { label: "Rejected", count: stats.rejected, grad: "linear-gradient(135deg,#7F1D1D,#DC2626)" },
-                ].map(f => (
-                  <button key={f.label}
-                    onClick={() => setFilterStatus(f.label)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all ${filterChip(f.label)}`}
-                    style={filterStatus === f.label ? { background: f.grad } : dark ? { border: "1px solid rgba(255,255,255,0.08)" } : {}}
-                  >
-                    {f.label}
-                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${filterStatus === f.label ? "bg-white/20 text-white" : dark ? "bg-white/8 text-slate-500" : "bg-slate-100 text-slate-500"
-                      }`}>{f.count}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* Table */}
-              {filteredBookings.length === 0 ? (
-                <div className={`${cardClass} p-16 text-center`}>
-                  <Icon path={ICONS.bookings} className={`w-12 h-12 mx-auto mb-3 ${dark ? "text-slate-600" : "text-slate-300"}`} />
-                  <p className={textSecondary}>No {filterStatus.toLowerCase()} bookings found</p>
-                </div>
-              ) : (
-                <div className={`${cardClass} overflow-hidden`}>
-                  <div className="overflow-x-auto">
-                    <table className={`w-full ${dark ? "table-dark" : "table-light"}`}>
-                      <thead>
-                        <tr>
-                          <th>#</th>
-                          <th>Customer</th>
-                          <th>Vehicle</th>
-                          <th>Service Date</th>
-                          <th>Issue</th>
-                          <th>Status</th>
-                          <th className="text-right">Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredBookings.map((b, idx) => (
-                          <tr key={b._id} onClick={() => setSelectedBooking(b)}
-                            className="cursor-pointer" style={{ transition: 'background 0.15s' }}>
-                            <td className={`font-mono text-xs ${dark ? "text-slate-600" : "text-slate-400"}`}>
-                              #{(idx + 1).toString().padStart(3, "0")}
-                            </td>
-                            <td>
-                              <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                                  style={{ background: "linear-gradient(135deg,#7C3AED,#4F46E5)" }}>
-                                  {(b.userId?.name || "?")[0].toUpperCase()}
-                                </div>
-                                <div>
-                                  <div className={`font-medium text-sm ${textPrimary}`}>{b.userId?.name || "N/A"}</div>
-                                  <div className={`text-xs ${textSecondary}`}>{b.userId?.email || ""}</div>
-                                </div>
-                              </div>
-                            </td>
-                            <td>
-                              <span className="font-mono font-bold text-sm px-2 py-1 rounded-lg"
-                                style={{ background: dark ? "rgba(99,102,241,0.15)" : "#EEF2FF", color: dark ? "#A5B4FC" : "#4338CA" }}>
-                                {b.vehicleNumber}
-                              </span>
-                            </td>
-                            <td>
-                              <div className={`text-sm ${textPrimary}`}>{b.serviceDate}</div>
-                              <div className={`text-xs ${textSecondary}`}>{b.serviceTime}</div>
-                            </td>
-                            <td>
-                              {b.issueCategories?.length > 0 ? (
-                                <div className="flex flex-wrap gap-1">
-                                  {b.issueCategories.slice(0, 2).map((c, i) => (
-                                    <span key={i} className="text-xs px-2 py-0.5 rounded-full"
-                                      style={{ background: dark ? "rgba(124,58,237,0.15)" : "#F3E8FF", color: dark ? "#C4B5FD" : "#7C3AED" }}>
-                                      {c}
-                                    </span>
-                                  ))}
-                                  {b.issueCategories.length > 2 && (
-                                    <span className={`text-xs ${textSecondary}`}>+{b.issueCategories.length - 2}</span>
-                                  )}
-                                </div>
-                              ) : (
-                                <span className={`text-xs italic ${textSecondary}`}>{b.issue?.slice(0, 30) || "—"}</span>
-                              )}
-                            </td>
-                            <td><span className={badgeFn(b.status)}>{b.status}</span></td>
-                            <td className="text-right">
-                              <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedBooking(b); }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ml-auto"
-                                style={{
-                                  background: dark ? 'rgba(124,58,237,0.15)' : '#F3E8FF',
-                                  color: dark ? '#C4B5FD' : '#7C3AED',
-                                  border: dark ? '1px solid rgba(124,58,237,0.3)' : '1px solid #E9D5FF'
-                                }}>
-                                <Icon path={ICONS.info} className="w-3.5 h-3.5" />
-                                View Details
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
+          {activeTab === "bookings" && <AdminBookingsTab {...adminCommonProps} />}
 
           {/* ══════ USERS ══════ */}
-          {activeTab === "users" && (
-            <div className="page-transition">
-              <div className="mb-6">
-                <h2 className={`text-xl font-bold ${textPrimary}`}>User Management</h2>
-                <p className={`text-sm ${textSecondary}`}>{uniqueUsers.length} registered users</p>
-              </div>
-
-              {uniqueUsers.length === 0 ? (
-                <div className={`${cardClass} p-16 text-center`}>
-                  <Icon path={ICONS.users} className={`w-12 h-12 mx-auto mb-3 ${dark ? "text-slate-600" : "text-slate-300"}`} />
-                  <p className={textSecondary}>No users found</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {uniqueUsers.map(u => {
-                    if (!u) return null;
-                    const userBookings = bookings.filter(b => b.userId?._id === u._id);
-                    return (
-                      <div key={u._id} className={`${cardClass} p-5 cursor-pointer transition-all hover:scale-[1.02]`}
-                        onClick={() => setSelectedUser(u)}
-                        style={{ transition: 'transform 0.15s, box-shadow 0.15s' }}>
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold text-base flex-shrink-0"
-                            style={{ background: "linear-gradient(135deg,#7C3AED,#4F46E5)" }}>
-                            {(u.name || "?")[0].toUpperCase()}
-                          </div>
-                          <div className="min-w-0">
-                            <div className={`font-semibold truncate ${textPrimary}`}>{u.name}</div>
-                            <div className={`text-xs truncate ${textSecondary}`}>{u.email}</div>
-                          </div>
-                          <Icon path={ICONS.chevronRight} className={`w-4 h-4 ml-auto flex-shrink-0 ${textSecondary}`} />
-                        </div>
-                        <div className="grid grid-cols-3 gap-2 text-center">
-                          {[
-                            { label: "Total", val: userBookings.length, color: dark ? "#A78BFA" : "#7C3AED" },
-                            { label: "Accepted", val: userBookings.filter(b => b.status === "Accepted").length, color: "#22C55E" },
-                            { label: "Pending", val: userBookings.filter(b => b.status === "Pending").length, color: "#EAB308" },
-                          ].map(item => (
-                            <div key={item.label} className="py-2 rounded-xl"
-                              style={{ background: dark ? "rgba(255,255,255,0.04)" : "#F8FAFF" }}>
-                              <div className="font-bold text-xl" style={{ color: item.color }}>{item.val}</div>
-                              <div className={`text-xs ${textSecondary}`}>{item.label}</div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
+          {activeTab === "users" && <AdminUsersTab {...adminCommonProps} />}
         </main>
       </div>
 
@@ -886,12 +602,12 @@ const AdminDashboard = () => {
                     border: dark ? '1px solid rgba(37,99,235,0.2)' : '1px solid rgba(37,99,235,0.15)'
                   }}>
                     <div className="p-4">
-                      <div className={`flex items-center gap-2 text-sm font-semibold mb-3 ${dark ? 'text-blue-400' : 'text-blue-600'}`}>
+                      <div className={`flex items-center gap-2 text-sm font-semibold mb-3 ${dark ? 'text-green-400' : 'text-green-600'}`}>
                         <Icon path={ICONS.truck} className="w-4 h-4" /> Doorstep Service Requested
                       </div>
                       <div className="grid grid-cols-2 gap-3 mb-3">
                         <div className="rounded-lg p-3 text-center" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#F0F4FF' }}>
-                          <div className={`text-xl font-black ${dark ? 'text-blue-400' : 'text-blue-600'}`}>
+                          <div className={`text-xl font-black ${dark ? 'text-green-400' : 'text-green-600'}`}>
                             {selectedBooking.distanceKm || '—'} <span className="text-xs font-semibold">km</span>
                           </div>
                           <div className={`text-xs ${textSecondary}`}>Distance</div>
@@ -1070,7 +786,7 @@ const AdminDashboard = () => {
                             </span>
                             {b.doorstepDelivery && (
                               <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
-                                style={{ background: dark ? 'rgba(37,99,235,0.15)' : '#DBEAFE', color: dark ? '#93C5FD' : '#1D4ED8' }}>
+                                style={{ background: dark ? 'rgba(37,99,235,0.15)' : '#DBEAFE', color: dark ? '#93C5FD' : '#16A34A' }}>
                                 <Icon path={ICONS.truck} className="w-3 h-3" /> Doorstep
                                 {b.doorstepCharge ? ` ₹${b.doorstepCharge}` : ''}
                               </span>
@@ -1087,7 +803,7 @@ const AdminDashboard = () => {
                             </div>
                           )}
                           {b.pickupLocation?.address && (
-                            <div className={`flex items-start gap-1.5 mt-2 text-xs ${dark ? 'text-blue-400' : 'text-blue-600'}`}>
+                            <div className={`flex items-start gap-1.5 mt-2 text-xs ${dark ? 'text-green-400' : 'text-green-600'}`}>
                               <Icon path={ICONS.mapPin} className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
                               <span className="line-clamp-1">{b.pickupLocation.address}</span>
                             </div>
@@ -1116,7 +832,7 @@ const AdminDashboard = () => {
                               </span>
                               <span className={`text-xs ${textSecondary}`}>{b.serviceDate}</span>
                               {b.doorstepDelivery && b.distanceKm && (
-                                <span className={`ml-auto text-xs font-semibold ${dark ? 'text-blue-400' : 'text-blue-600'}`}>
+                                <span className={`ml-auto text-xs font-semibold ${dark ? 'text-green-400' : 'text-green-600'}`}>
                                   {b.distanceKm} km · ₹{b.doorstepCharge || 100}
                                 </span>
                               )}

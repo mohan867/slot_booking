@@ -74,7 +74,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
         <div className="flex justify-center mb-8">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center animate-pulse-glow"
-              style={{ background: "linear-gradient(135deg, #2563EB, #38BDF8)" }}>
+              style={{ background: "linear-gradient(135deg, #22C55E, #4ADE80)" }}>
               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                   d="M13 10V3L4 14h7v7l9-11h-7z" />
@@ -82,7 +82,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
             </div>
             <div>
               <div className="text-white font-bold text-xl tracking-tight">RMK Garage</div>
-              <div className="text-xs" style={{ color: "#38BDF8" }}>Vehicle Service Portal</div>
+              <div className="text-xs" style={{ color: "#4ADE80" }}>Vehicle Service Portal</div>
             </div>
           </div>
         </div>
@@ -99,7 +99,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
                 : "text-slate-400 hover:text-slate-200"
                 }`}
               style={isLogin ? {
-                background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+                background: "linear-gradient(135deg, #22C55E, #16A34A)",
                 boxShadow: "0 4px 16px rgba(37,99,235,0.35)"
               } : {}}
             >
@@ -113,7 +113,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
                 : "text-slate-400 hover:text-slate-200"
                 }`}
               style={!isLogin ? {
-                background: "linear-gradient(135deg, #2563EB, #1D4ED8)",
+                background: "linear-gradient(135deg, #22C55E, #16A34A)",
                 boxShadow: "0 4px 16px rgba(37,99,235,0.35)"
               } : {}}
             >
@@ -185,7 +185,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors"
-                style={{ color: showPassword ? "#2563EB" : "#475569" }}
+                style={{ color: showPassword ? "#22C55E" : "#475569" }}
               >
                 {showPassword ? (
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,9 +207,9 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
             {isLogin && (
               <div className="flex justify-end">
                 <button type="button" className="text-xs transition-colors"
-                  style={{ color: "#38BDF8" }}
+                  style={{ color: "#4ADE80" }}
                   onMouseEnter={e => e.target.style.color = "#0EA5E9"}
-                  onMouseLeave={e => e.target.style.color = "#38BDF8"}>
+                  onMouseLeave={e => e.target.style.color = "#4ADE80"}>
                   Forgot password?
                 </button>
               </div>
@@ -271,11 +271,11 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
                 <span>Secure Auth</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#2563EB" }} />
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#22C55E" }} />
                 <span>Fast Booking</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#38BDF8" }} />
+                <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#4ADE80" }} />
                 <span>24/7 Online</span>
               </div>
             </div>
@@ -290,7 +290,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
               onClick={onBack}
               className="flex items-center gap-1.5 text-xs transition-colors"
               style={{ color: "#334155" }}
-              onMouseEnter={e => e.currentTarget.style.color = "#38BDF8"}
+              onMouseEnter={e => e.currentTarget.style.color = "#4ADE80"}
               onMouseLeave={e => e.currentTarget.style.color = "#334155"}
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

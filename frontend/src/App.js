@@ -72,7 +72,7 @@ function PortalSelect({ onSelect }) {
           <div
             className="w-14 h-14 rounded-2xl flex items-center justify-center"
             style={{
-              background: "linear-gradient(135deg, #2563EB, #38BDF8)",
+              background: "linear-gradient(135deg, #22C55E, #4ADE80)",
               boxShadow: "0 8px 32px rgba(37,99,235,0.4)",
             }}
           >
@@ -140,7 +140,7 @@ function PortalSelect({ onSelect }) {
             <div
               className="absolute top-0 left-0 right-0 h-0.5 rounded-t-3xl transition-opacity duration-300"
               style={{
-                background: "linear-gradient(90deg, transparent, #2563EB, #38BDF8, transparent)",
+                background: "linear-gradient(90deg, transparent, #22C55E, #4ADE80, transparent)",
                 opacity: hovered === "user" ? 1 : 0,
               }}
             />
@@ -150,7 +150,7 @@ function PortalSelect({ onSelect }) {
               className="w-14 h-14 rounded-2xl flex items-center justify-center mb-5 transition-all duration-300"
               style={{
                 background: hovered === "user"
-                  ? "linear-gradient(135deg, #2563EB, #38BDF8)"
+                  ? "linear-gradient(135deg, #22C55E, #4ADE80)"
                   : "rgba(37,99,235,0.15)",
                 boxShadow: hovered === "user" ? "0 8px 24px rgba(37,99,235,0.4)" : "none",
               }}
