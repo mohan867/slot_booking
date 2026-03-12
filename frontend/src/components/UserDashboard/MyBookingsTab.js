@@ -33,7 +33,11 @@ const MyBookingsTab = (props) => {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {bookings.map(b => {
-                const statusColor = b.status === "Pending" ? "#FBBF24" : b.status === "Accepted" ? "#22C55E" : "#F87171";
+                const statusColorMap = {
+                  Pending: "#FBBF24", Accepted: "#22C55E", Rejected: "#F87171",
+                  Assigned: "#3B82F6", "In Progress": "#A78BFA", Completed: "#34D399"
+                };
+                const statusColor = statusColorMap[b.status] || "#FBBF24";
                 return (
                   <div key={b._id} className="rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
                     style={{
@@ -52,7 +56,7 @@ const MyBookingsTab = (props) => {
                           style={{
                             background: '#0F1520',
                             border: '1px solid rgba(255,255,255,0.06)',
-                            color: '#4ADE80',
+                            color: '#60A5FA',
                           }}>{b.vehicleNumber}</div>
                         <span className={badgeFn(b.status)}>{b.status}</span>
                       </div>
@@ -70,8 +74,8 @@ const MyBookingsTab = (props) => {
                       {/* Doorstep */}
                       {(b.doorstepDelivery || b.pickupLocation?.lat) && (
                         <div className="rounded-xl p-3 mb-3"
-                          style={{ background: '#0F1520', border: '1px solid rgba(34,197,94,0.15)' }}>
-                          <div className="flex items-center gap-2 text-xs font-semibold mb-1.5 text-green-400">
+                          style={{ background: '#0F1520', border: '1px solid rgba(37,99,235,0.15)' }}>
+                          <div className="flex items-center gap-2 text-xs font-semibold mb-1.5 text-blue-400">
                             <Icon path={ICONS.mapPin} className="w-3.5 h-3.5" /> Doorstep Pickup & Delivery
                           </div>
                           <div className="flex items-center gap-3 text-xs">
@@ -100,11 +104,38 @@ const MyBookingsTab = (props) => {
                           {b.issueCategories.map((c, i) => (
                             <span key={i} className="text-xs px-2 py-0.5 rounded-full"
                               style={{
-                                background: 'rgba(34,197,94,0.08)',
-                                color: '#4ADE80',
-                                border: '1px solid rgba(34,197,94,0.2)',
+                                background: 'rgba(37,99,235,0.08)',
+                                color: '#60A5FA',
+                                border: '1px solid rgba(37,99,235,0.2)',
                               }}>{c}</span>
                           ))}
+                        </div>
+                      )}
+
+                      {/* Assigned Staff Info */}
+                      {b.staffId && (
+                        <div className="rounded-xl p-3 mb-3"
+                          style={{ background: '#0F1520', border: '1px solid rgba(59,130,246,0.15)' }}>
+                          <div className="flex items-center gap-2 text-xs font-semibold mb-1.5" style={{ color: '#60A5FA' }}>
+                            <Icon path={ICONS.user} className="w-3.5 h-3.5" /> Assigned Technician
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium text-white">{b.staffId.name}</span>
+                            {b.staffId.phone && (
+                              <span className="text-xs" style={{ color: '#6B7A90' }}>· {b.staffId.phone}</span>
+                            )}
+                          </div>
+                          {b.staffId.specialization && (
+                            <div className="text-xs mt-1" style={{ color: '#4ADE80' }}>{b.staffId.specialization}</div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Completed badge */}
+                      {b.status === "Completed" && (
+                        <div className="flex items-center gap-2 py-2.5 rounded-xl justify-center text-xs font-semibold mb-3"
+                          style={{ background: 'rgba(16,185,129,0.08)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.15)' }}>
+                          <Icon path={ICONS.check} className="w-3.5 h-3.5" /> Service Completed
                         </div>
                       )}
 
@@ -115,12 +146,12 @@ const MyBookingsTab = (props) => {
                             onClick={() => setRescheduleModal({ isOpen: true, booking: b, newDate: b.serviceDate, newTime: b.serviceTime })}
                             className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all"
                             style={{
-                              background: 'rgba(34,197,94,0.06)',
-                              border: '1px solid rgba(34,197,94,0.2)',
-                              color: '#4ADE80',
+                              background: 'rgba(37,99,235,0.06)',
+                              border: '1px solid rgba(37,99,235,0.2)',
+                              color: '#60A5FA',
                             }}
-                            onMouseEnter={(e) => e.target.style.background = 'rgba(34,197,94,0.12)'}
-                            onMouseLeave={(e) => e.target.style.background = 'rgba(34,197,94,0.06)'}
+                            onMouseEnter={(e) => e.target.style.background = 'rgba(37,99,235,0.12)'}
+                            onMouseLeave={(e) => e.target.style.background = 'rgba(37,99,235,0.06)'}
                           >
                             Reschedule
                           </button>

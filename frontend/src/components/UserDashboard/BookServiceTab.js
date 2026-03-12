@@ -13,15 +13,15 @@ const BookServiceTab = (props) => {
 
             {/* Card Header */}
             <div className="px-6 py-5 relative overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, #166534, #22C55E)' }}>
+              style={{ background: 'linear-gradient(135deg, #1E40AF, #3B82F6)' }}>
               <div className="absolute -right-6 -top-6 w-28 h-28 rounded-full"
                 style={{ background: 'rgba(255,255,255,0.08)' }} />
               <div className="relative z-10">
                 <h2 className="text-white font-bold text-lg flex items-center gap-2">
-                  <Icon path={ICONS.book} className="w-5 h-5 text-green-200" />
+                  <Icon path={ICONS.book} className="w-5 h-5 text-blue-200" />
                   Book a Service Slot
                 </h2>
-                <p className="text-green-200/70 text-xs mt-1">Fill in details to schedule your vehicle service</p>
+                <p className="text-blue-200/70 text-xs mt-1">Fill in details to schedule your vehicle service</p>
               </div>
             </div>
 
@@ -53,9 +53,9 @@ const BookServiceTab = (props) => {
                       <label key={cat}
                         className="flex items-center gap-2 px-3 py-2.5 rounded-xl cursor-pointer text-xs font-medium transition-all"
                         style={{
-                          background: checked ? 'rgba(34,197,94,0.08)' : '#0F1520',
-                          border: checked ? '1px solid rgba(34,197,94,0.35)' : '1px solid rgba(255,255,255,0.06)',
-                          color: checked ? '#4ADE80' : '#6B7A90',
+                          background: checked ? 'rgba(37,99,235,0.08)' : '#0F1520',
+                          border: checked ? '1px solid rgba(37,99,235,0.4)' : '1px solid rgba(255,255,255,0.06)',
+                          color: checked ? '#60A5FA' : '#6B7A90',
                         }}>
                         <input type="checkbox" className="hidden"
                           checked={checked}
@@ -64,7 +64,7 @@ const BookServiceTab = (props) => {
                         />
                         <span className="w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-all"
                           style={{
-                            background: checked ? '#22C55E' : 'rgba(255,255,255,0.06)',
+                            background: checked ? '#3B82F6' : 'rgba(255,255,255,0.06)',
                             border: checked ? 'none' : '1px solid rgba(255,255,255,0.1)',
                           }}>
                           {checked && <Icon path={ICONS.check} className="w-2.5 h-2.5 text-white" />}
@@ -133,10 +133,10 @@ const BookServiceTab = (props) => {
                             style={{
                               opacity: full ? 0.3 : 1,
                               cursor: full ? 'not-allowed' : 'pointer',
-                              background: selected ? 'linear-gradient(135deg, #166534, #22C55E)' : '#0F1520',
-                              border: selected ? '1px solid rgba(34,197,94,0.5)' : '1px solid rgba(255,255,255,0.06)',
+                              background: selected ? 'linear-gradient(135deg, #1E40AF, #3B82F6)' : '#0F1520',
+                              border: selected ? '1px solid rgba(37,99,235,0.5)' : '1px solid rgba(255,255,255,0.06)',
                               color: selected ? '#fff' : '#6B7A90',
-                              boxShadow: selected ? '0 4px 16px rgba(34,197,94,0.3)' : 'none',
+                              boxShadow: selected ? '0 4px 16px rgba(37,99,235,0.3)' : 'none',
                               transform: selected ? 'scale(1.05)' : 'scale(1)',
                             }}
                           >
@@ -166,9 +166,9 @@ const BookServiceTab = (props) => {
                 <div className="rounded-2xl transition-all duration-300 animate-fadeIn overflow-hidden"
                   style={{
                     background: formData.doorstepDelivery
-                      ? 'rgba(34,197,94,0.04)' : '#0F1520',
+                      ? 'rgba(37,99,235,0.04)' : '#0F1520',
                     border: formData.doorstepDelivery
-                      ? '1px solid rgba(34,197,94,0.2)' : '1px solid rgba(255,255,255,0.06)',
+                      ? '1px solid rgba(37,99,235,0.2)' : '1px solid rgba(255,255,255,0.06)',
                   }}
                 >
                   {/* Toggle Header */}
@@ -176,7 +176,7 @@ const BookServiceTab = (props) => {
                     <div className="flex items-center gap-3">
                       <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
                         style={{
-                          background: formData.doorstepDelivery ? 'linear-gradient(135deg, #166534, #22C55E)' : 'rgba(255,255,255,0.04)',
+                          background: formData.doorstepDelivery ? 'linear-gradient(135deg, #1E40AF, #3B82F6)' : 'rgba(255,255,255,0.04)',
                           border: formData.doorstepDelivery ? 'none' : '1px solid rgba(255,255,255,0.06)',
                         }}>
                         <Icon path={ICONS.mapPin}
@@ -203,9 +203,9 @@ const BookServiceTab = (props) => {
                       style={{
                         width: 48, height: 26, borderRadius: 13,
                         background: formData.doorstepDelivery
-                          ? 'linear-gradient(135deg, #22C55E, #4ADE80)' : 'rgba(255,255,255,0.08)',
+                          ? 'linear-gradient(135deg, #3B82F6, #60A5FA)' : 'rgba(255,255,255,0.08)',
                         cursor: loading ? 'not-allowed' : 'pointer',
-                        boxShadow: formData.doorstepDelivery ? '0 0 12px rgba(34,197,94,0.3)' : 'none',
+                        boxShadow: formData.doorstepDelivery ? '0 0 12px rgba(37,99,235,0.3)' : 'none',
                       }}
                     >
                       <span

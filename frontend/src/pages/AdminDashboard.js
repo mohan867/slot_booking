@@ -1,10 +1,11 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import API from "../services/api";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import AdminDashboardTab from '../components/AdminDashboard/AdminDashboardTab';
 import AdminBookingsTab from '../components/AdminDashboard/AdminBookingsTab';
 import AdminUsersTab from '../components/AdminDashboard/AdminUsersTab';
+import AdminStaffTab from '../components/AdminDashboard/AdminStaffTab';
 
 
 /* ── Shop Location (RMK Garage) ─── */
@@ -19,8 +20,8 @@ L.Icon.Default.mergeOptions({
 });
 
 /* ── Icon Helper ───────────────────────────────────────────── */
-const Icon = ({ path, className = "w-5 h-5" }) => (
-  <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+const Icon = ({ path, className = "w-5 h-5", style }) => (
+  <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={path} />
   </svg>
 );
@@ -54,10 +55,24 @@ const ICONS = {
 
 const getStatusBadge = (status, dark) => {
   if (dark) {
-    const map = { Pending: "badge-pending", Accepted: "badge-accepted", Rejected: "badge-rejected" };
+    const map = {
+      Pending: "badge-pending",
+      Accepted: "badge-accepted",
+      Rejected: "badge-rejected",
+      Assigned: "badge-assigned",
+      "In Progress": "badge-inprogress",
+      Completed: "badge-completed"
+    };
     return map[status] || "badge-pending";
   }
-  const map = { Pending: "badge-pending-light", Accepted: "badge-accepted-light", Rejected: "badge-rejected-light" };
+  const map = {
+    Pending: "badge-pending-light",
+    Accepted: "badge-accepted-light",
+    Rejected: "badge-rejected-light",
+    Assigned: "badge-assigned-light",
+    "In Progress": "badge-inprogress-light",
+    Completed: "badge-completed-light"
+  };
   return map[status] || "badge-pending-light";
 };
 
@@ -67,6 +82,7 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
     { id: "dashboard", label: "Dashboard", icon: ICONS.dashboard },
     { id: "bookings", label: "All Bookings", icon: ICONS.bookings },
     { id: "users", label: "Users", icon: ICONS.users },
+    { id: "staff", label: "Staff", icon: ICONS.wrench },
   ];
 
   const sidebarBg = dark ? "sidebar-dark" : "sidebar-light";
@@ -88,13 +104,13 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
         sidebar-transition
         ${sidebarBg}
         ${sidebarOpen ? "sidebar-mobile-visible" : "sidebar-mobile-hidden"}
-        lg:translate-x-0
-      `}>
+      `}
+      style={{ transform: typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'translateX(0)' : undefined }}>
         {/* Logo */}
         <div className="flex items-center gap-3 px-6 py-6"
           style={{ borderBottom: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)" }}>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, #7C3AED, #4F46E5)" }}>
+            style={{ background: "linear-gradient(135deg, #166534, #22C55E)" }}>
             <Icon path={ICONS.shield} className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -110,8 +126,8 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
         {/* Badge */}
         <div className="px-6 py-3">
           <div className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
-            style={{ background: "rgba(124,58,237,0.15)", color: "#A78BFA", border: "1px solid rgba(124,58,237,0.3)" }}>
-            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse" />
+            style={{ background: "rgba(34,197,94,0.1)", color: "#4ADE80", border: "1px solid rgba(34,197,94,0.2)" }}>
+            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#4ADE80' }} />
             Administrator
           </div>
         </div>
@@ -134,7 +150,7 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
               <Icon path={item.icon} className="w-5 h-5 flex-shrink-0" />
               {item.label}
               {activeTab === item.id && (
-                <span className="ml-auto w-2 h-2 rounded-full" style={{ background: "linear-gradient(135deg, #7C3AED, #4F46E5)" }} />
+                <span className="ml-auto w-2 h-2 rounded-full" style={{ background: "linear-gradient(135deg, #166534, #22C55E)" }} />
               )}
             </button>
           ))}
@@ -145,7 +161,7 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
           style={{ borderTop: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
           <div className="flex items-center gap-3 px-3 py-3" style={{ borderRadius: 12 }}>
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #7C3AED, #4F46E5)" }}>A</div>
+              style={{ background: "linear-gradient(135deg, #166534, #22C55E)" }}>A</div>
             <div>
               <div className={`text-sm font-semibold ${dark ? "text-slate-200" : "text-slate-700"}`}>Admin User</div>
               <div className={`text-xs ${dark ? "text-slate-500" : "text-slate-400"}`}>admin@rmk.com</div>
@@ -162,21 +178,6 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
   );
 };
 
-/* ── Stat Card ────────────────────────────────────────────── */
-const StatCard = ({ label, value, sub, gradient, icon, delay = 0 }) => (
-  <div className="stat-card animate-fadeInUp" style={{ background: gradient, animationDelay: `${delay}ms` }}>
-    <div className="flex items-center justify-between mb-4">
-      <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
-        style={{ background: "rgba(255,255,255,0.15)" }}>
-        <Icon path={icon} className="w-6 h-6 text-white" />
-      </div>
-      <div className="text-3xl font-black text-white">{value}</div>
-    </div>
-    <div className="text-sm font-semibold text-white/80 uppercase tracking-wide">{label}</div>
-    <div className="text-xs text-white/50 mt-1">{sub}</div>
-  </div>
-);
-
 /* ══════════════════════════════════════════════════════════ */
 /*                     ADMIN DASHBOARD                       */
 /* ══════════════════════════════════════════════════════════ */
@@ -184,16 +185,51 @@ const AdminDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filterStatus, setFilterStatus] = useState("All");
-  const [activeTab, setActiveTab] = useState("dashboard");
+  const getInitialTab = () => {
+    const hash = window.location.hash.replace('#', '');
+    return ['dashboard', 'bookings', 'users', 'staff'].includes(hash) ? hash : 'dashboard';
+  };
+  const [activeTab, setActiveTabState] = useState(getInitialTab);
   const [dark, setDark] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const setActiveTab = (tab) => {
+    setActiveTabState(tab);
+    window.location.hash = tab;
+  };
+
+  /* ── Sync tab with browser back/forward ── */
+  useEffect(() => {
+    const onHashChange = () => {
+      const hash = window.location.hash.replace('#', '');
+      if (['dashboard', 'bookings', 'users', 'staff'].includes(hash)) {
+        setActiveTabState(hash);
+      }
+    };
+    window.addEventListener('hashchange', onHashChange);
+    return () => window.removeEventListener('hashchange', onHashChange);
+  }, []);
   const [actionLoading, setActionLoading] = useState(null);
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [availableStaff, setAvailableStaff] = useState([]);
+  const [allStaff, setAllStaff] = useState([]);
+  const [staffLoadError, setStaffLoadError] = useState("");
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [assignStaffId, setAssignStaffId] = useState("");
 
   /* ── Admin map refs for booking detail ── */
   const adminMapContainerRef = useRef(null);
   const adminMapInstanceRef = useRef(null);
+
+  /* ── Auto-load staff when booking modal opens for assignment ── */
+  useEffect(() => {
+    if (selectedBooking && !selectedBooking.staffId &&
+        (selectedBooking.status === 'Pending' || selectedBooking.status === 'Accepted')) {
+      fetchAvailableStaff();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedBooking?._id]);
 
   /* ── Initialize map when booking detail modal opens with location ── */
   useEffect(() => {
@@ -225,7 +261,7 @@ const AdminDashboard = () => {
 
       // Shop marker
       const shopIcon = L.divIcon({
-        html: `<div style="background:linear-gradient(135deg,#7C3AED,#4F46E5);width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center">
+        html: `<div style="background:linear-gradient(135deg,#166534,#22C55E);width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
         </div>`,
         className: '', iconSize: [36, 36], iconAnchor: [18, 36]
@@ -296,11 +332,48 @@ const AdminDashboard = () => {
     window.location.reload();
   };
 
+  const fetchAvailableStaff = async () => {
+    setStaffLoading(true);
+    setStaffLoadError("");
+    try {
+      const [availRes, allRes] = await Promise.all([
+        API.get("/admin/available-staff"),
+        API.get("/staff/all")
+      ]);
+      setAvailableStaff(availRes.data);
+      setAllStaff(allRes.data);
+    } catch (e) {
+      console.error(e);
+      setStaffLoadError(e.response?.data?.message || "Failed to load staff. Check if backend is running.");
+    } finally {
+      setStaffLoading(false);
+    }
+  };
+
+  const assignStaffToBooking = async (bookingId, staffObjId) => {
+    if (!staffObjId) return;
+    setActionLoading(bookingId + "assign");
+    try {
+      const res = await API.put(`/admin/assign-staff/${bookingId}`, { staffId: staffObjId });
+      setBookings(prev => prev.map(b =>
+        b._id === bookingId ? res.data.booking : b
+      ));
+      if (selectedBooking && selectedBooking._id === bookingId) {
+        setSelectedBooking(res.data.booking);
+      }
+      setAssignStaffId("");
+    } catch (e) { console.error(e); }
+    finally { setActionLoading(null); }
+  };
+
   const stats = {
     total: bookings.length,
     pending: bookings.filter(b => b.status === "Pending").length,
     accepted: bookings.filter(b => b.status === "Accepted").length,
     rejected: bookings.filter(b => b.status === "Rejected").length,
+    assigned: bookings.filter(b => b.status === "Assigned").length,
+    inProgress: bookings.filter(b => b.status === "In Progress").length,
+    completed: bookings.filter(b => b.status === "Completed").length,
   };
 
   const filteredBookings = bookings.filter(b =>
@@ -320,8 +393,8 @@ const AdminDashboard = () => {
   const filterChip = (status) => {
     const isActive = filterStatus === status;
     if (!isActive) return dark
-      ? "border border-white/8 text-slate-400 hover:border-violet-500/30 hover:text-violet-300"
-      : "border border-slate-200 text-slate-500 hover:border-violet-300 hover:text-violet-600";
+      ? "border border-white/8 text-slate-400 hover:border-green-500/30 hover:text-green-300"
+      : "border border-slate-200 text-slate-500 hover:border-green-300 hover:text-green-600";
 
     return `text-white border-transparent`;
   };
@@ -332,6 +405,8 @@ const AdminDashboard = () => {
     loading, fetchBookings, filterStatus, setFilterStatus,
     setActiveTab, setSelectedBooking, setSelectedUser,
     ICONS, SHOP_LOCATION,
+    availableStaff, allStaff, staffLoadError, staffLoading, fetchAvailableStaff, assignStaffToBooking,
+    assignStaffId, setAssignStaffId, actionLoading,
   };
 
   return (
@@ -364,6 +439,7 @@ const AdminDashboard = () => {
                 {activeTab === "dashboard" && "Admin Dashboard"}
                 {activeTab === "bookings" && "Booking Management"}
                 {activeTab === "users" && "User Management"}
+                {activeTab === "staff" && "Staff Management"}
               </h1>
               <p className={`text-xs ${textSecondary}`}>
                 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
@@ -407,6 +483,9 @@ const AdminDashboard = () => {
 
           {/* ══════ USERS ══════ */}
           {activeTab === "users" && <AdminUsersTab {...adminCommonProps} />}
+
+          {/* ══════ STAFF ══════ */}
+          {activeTab === "staff" && <AdminStaffTab {...adminCommonProps} />}
         </main>
       </div>
 
@@ -423,7 +502,7 @@ const AdminDashboard = () => {
               backdropFilter: 'blur(40px)'
             }}>
             {/* Header Gradient */}
-            <div className="p-6 pb-4" style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)', borderRadius: '24px 24px 0 0' }}>
+            <div className="p-6 pb-4" style={{ background: 'linear-gradient(135deg, #166534, #22C55E)', borderRadius: '24px 24px 0 0' }}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-bold text-lg">Booking Details</h3>
                 <button onClick={() => setSelectedBooking(null)}
@@ -463,8 +542,8 @@ const AdminDashboard = () => {
                   border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
                 }}>
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(124,58,237,0.15)' }}>
-                      <Icon path={ICONS.user} className="w-4 h-4" style={{ color: '#A78BFA' }} />
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)' }}>
+                      <Icon path={ICONS.user} className="w-4 h-4" style={{ color: '#4ADE80' }} />
                     </div>
                     <div>
                       <div className={`text-xs ${textSecondary}`}>Name</div>
@@ -516,21 +595,35 @@ const AdminDashboard = () => {
                   <div className="grid grid-cols-2 gap-4">
                     {/* Vehicle */}
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.15)' }}>
-                        <Icon path={ICONS.car} className="w-4 h-4" style={{ color: '#818CF8' }} />
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)' }}>
+                        <Icon path={ICONS.car} className="w-4 h-4" style={{ color: '#4ADE80' }} />
                       </div>
                       <div>
                         <div className={`text-xs ${textSecondary}`}>Vehicle</div>
-                        <div className="font-mono font-bold text-sm" style={{ color: dark ? '#A5B4FC' : '#4338CA' }}>{selectedBooking.vehicleNumber}</div>
+                        <div className="font-mono font-bold text-sm" style={{ color: '#4ADE80' }}>{selectedBooking.vehicleNumber}</div>
                       </div>
                     </div>
                     {/* Status */}
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
-                        background: selectedBooking.status === 'Pending' ? 'rgba(234,179,8,0.15)' : selectedBooking.status === 'Accepted' ? 'rgba(34,197,94,0.15)' : 'rgba(239,68,68,0.15)'
+                        background: selectedBooking.status === 'Pending' ? 'rgba(234,179,8,0.15)'
+                          : selectedBooking.status === 'Rejected' ? 'rgba(239,68,68,0.15)'
+                          : selectedBooking.status === 'Completed' ? 'rgba(34,197,94,0.15)'
+                          : selectedBooking.status === 'In Progress' ? 'rgba(59,130,246,0.15)'
+                          : 'rgba(34,197,94,0.15)'
                       }}>
-                        <Icon path={selectedBooking.status === 'Pending' ? ICONS.clock : selectedBooking.status === 'Accepted' ? ICONS.check : ICONS.x} className="w-4 h-4"
-                          style={{ color: selectedBooking.status === 'Pending' ? '#EAB308' : selectedBooking.status === 'Accepted' ? '#22C55E' : '#EF4444' }} />
+                        <Icon path={
+                          selectedBooking.status === 'Pending' ? ICONS.clock
+                          : selectedBooking.status === 'Rejected' ? ICONS.x
+                          : selectedBooking.status === 'In Progress' ? ICONS.lightning
+                          : ICONS.check
+                        } className="w-4 h-4"
+                          style={{ color:
+                            selectedBooking.status === 'Pending' ? '#EAB308'
+                            : selectedBooking.status === 'Rejected' ? '#EF4444'
+                            : selectedBooking.status === 'In Progress' ? '#3B82F6'
+                            : '#22C55E'
+                          }} />
                       </div>
                       <div>
                         <div className={`text-xs ${textSecondary}`}>Status</div>
@@ -574,7 +667,7 @@ const AdminDashboard = () => {
                       <div className="flex flex-wrap gap-1.5">
                         {selectedBooking.issueCategories.map((c, i) => (
                           <span key={i} className="text-xs px-3 py-1 rounded-full font-medium"
-                            style={{ background: dark ? 'rgba(124,58,237,0.15)' : '#F3E8FF', color: dark ? '#C4B5FD' : '#7C3AED', border: dark ? '1px solid rgba(124,58,237,0.3)' : '1px solid #E9D5FF' }}>
+                            style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.15)' }}>
                             {c}
                           </span>
                         ))}
@@ -651,6 +744,124 @@ const AdminDashboard = () => {
 
 
 
+              {/* Assigned Staff Info */}
+              {selectedBooking.staffId && (
+                <div>
+                  <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Assigned Staff</div>
+                  <div className={`rounded-xl p-4`} style={{
+                    background: dark ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.04)',
+                    border: dark ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.15)'
+                  }}>
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
+                        style={{ background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}>
+                        {(selectedBooking.staffId.name || '?')[0].toUpperCase()}
+                      </div>
+                      <div className="flex-1">
+                        <div className={`text-sm font-semibold ${textPrimary}`}>{selectedBooking.staffId.name}</div>
+                        <div className={`text-xs ${textSecondary}`}>{selectedBooking.staffId.specialization} · {selectedBooking.staffId.phone}</div>
+                        <div className={`text-xs ${textSecondary}`}>{selectedBooking.staffId.email}</div>
+                      </div>
+                      <span className="text-xs font-mono px-2 py-1 rounded-lg"
+                        style={{ background: dark ? 'rgba(255,255,255,0.06)' : '#F1F5F9', color: dark ? '#94A3B8' : '#64748B' }}>
+                        {selectedBooking.staffId.staffId}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Assign Staff (for Accepted bookings without staff) */}
+              {(selectedBooking.status === 'Accepted' || selectedBooking.status === 'Pending') && !selectedBooking.staffId && (
+                <div>
+                  <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Assign Staff</div>
+                  <div className={`rounded-xl p-4`} style={{
+                    background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
+                    border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
+                  }}>
+                    {staffLoadError && (
+                      <div className="mb-3 p-3 rounded-xl text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
+                        {staffLoadError}
+                      </div>
+                    )}
+                    {staffLoading ? (
+                      <div className="text-center py-4">
+                        <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
+                        <p className={`text-sm ${textSecondary}`}>Loading staff...</p>
+                      </div>
+                    ) : allStaff.length === 0 ? (
+                      <div className="text-center py-3">
+                        <p className={`text-sm mb-2 ${textSecondary}`}>No staff members found. Add staff in Staff Management tab first.</p>
+                        <button onClick={fetchAvailableStaff}
+                          className="px-4 py-2 rounded-xl text-sm font-semibold text-white"
+                          style={{ background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}>
+                          Retry Loading Staff
+                        </button>
+                      </div>
+                    ) : availableStaff.length === 0 ? (
+                      <div className="text-center py-3">
+                        <p className={`text-sm mb-2`} style={{ color: '#FBBF24' }}>All staff members are currently busy or on leave.</p>
+                        <div className="space-y-2 mt-3">
+                          {allStaff.map(s => (
+                            <div key={s._id} className="flex items-center justify-between px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(255,255,255,0.03)' }}>
+                              <span style={{ color: '#8a9aaa' }}>{s.name} — {s.specialization}</span>
+                              <span className="px-2 py-0.5 rounded-full font-semibold" style={{
+                                background: s.availabilityStatus === 'Busy' ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
+                                color: s.availabilityStatus === 'Busy' ? '#FBBF24' : '#FCA5A5'
+                              }}>{s.availabilityStatus}</span>
+                            </div>
+                          ))}
+                        </div>
+                        <button onClick={fetchAvailableStaff}
+                          className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold"
+                          style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}>
+                          Refresh
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <select
+                          value={assignStaffId}
+                          onChange={(e) => setAssignStaffId(e.target.value)}
+                          className={`w-full px-3 py-2.5 rounded-xl text-sm ${dark ? 'bg-white/5 text-slate-200 border-white/10' : 'bg-white text-slate-700 border-slate-200'} border`}
+                        >
+                          <option value="">Select a staff member...</option>
+                          {allStaff.map(s => (
+                            <option key={s._id} value={s._id}
+                              disabled={s.availabilityStatus !== 'Available'}
+                              style={{ color: s.availabilityStatus !== 'Available' ? '#666' : undefined }}>
+                              {s.name} — {s.specialization} ({s.staffId}) {s.availabilityStatus !== 'Available' ? `[${s.availabilityStatus}]` : '✓ Available'}
+                            </option>
+                          ))}
+                        </select>
+                        <div className="flex gap-2">
+                          <button
+                            disabled={!assignStaffId || !!actionLoading}
+                            onClick={() => assignStaffToBooking(selectedBooking._id, assignStaffId)}
+                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] disabled:opacity-50"
+                            style={{ background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}>
+                            {actionLoading === selectedBooking._id + 'assign' ? (
+                              <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                              </svg> Assigning...</>
+                            ) : (
+                              <><Icon path={ICONS.users} className="w-4 h-4" /> Assign Staff</>
+                            )}
+                          </button>
+                          <button onClick={fetchAvailableStaff}
+                            className="px-3 py-2.5 rounded-xl transition-all"
+                            style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}
+                            title="Refresh staff list">
+                            <Icon path={ICONS.refresh} className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Actions */}
               {selectedBooking.status === 'Pending' && (
                 <div className="flex gap-3 pt-2">
@@ -696,7 +907,6 @@ const AdminDashboard = () => {
         const uAccepted = uBookings.filter(b => b.status === 'Accepted').length;
         const uPending = uBookings.filter(b => b.status === 'Pending').length;
         const uRejected = uBookings.filter(b => b.status === 'Rejected').length;
-        const uDoorstep = uBookings.filter(b => b.doorstepDelivery).length;
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/70 animate-fadeIn"
@@ -710,7 +920,7 @@ const AdminDashboard = () => {
               }}>
 
               {/* Header Gradient */}
-              <div className="p-6 pb-5" style={{ background: 'linear-gradient(135deg, #7C3AED, #4F46E5)', borderRadius: '24px 24px 0 0' }}>
+              <div className="p-6 pb-5" style={{ background: 'linear-gradient(135deg, #166534, #22C55E)', borderRadius: '24px 24px 0 0' }}>
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-white font-bold text-lg">Customer Profile</h3>
                   <button onClick={() => setSelectedUser(null)}
@@ -736,7 +946,7 @@ const AdminDashboard = () => {
                 {/* Stats Grid */}
                 <div className="grid grid-cols-4 gap-3">
                   {[
-                    { label: 'Total', val: uBookings.length, color: dark ? '#A78BFA' : '#7C3AED', bg: 'rgba(124,58,237,0.1)' },
+                    { label: 'Total', val: uBookings.length, color: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
                     { label: 'Accepted', val: uAccepted, color: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
                     { label: 'Pending', val: uPending, color: '#EAB308', bg: 'rgba(234,179,8,0.1)' },
                     { label: 'Rejected', val: uRejected, color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
@@ -771,7 +981,7 @@ const AdminDashboard = () => {
                           }}>
                           <div className="flex items-center gap-3 mb-2">
                             <span className="font-mono font-bold text-sm px-2 py-0.5 rounded-lg"
-                              style={{ background: dark ? 'rgba(99,102,241,0.15)' : '#EEF2FF', color: dark ? '#A5B4FC' : '#4338CA' }}>
+                              style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.12)' }}>
                               {b.vehicleNumber}
                             </span>
                             <span className={badgeFn(b.status)}>{b.status}</span>
@@ -796,7 +1006,7 @@ const AdminDashboard = () => {
                             <div className="flex flex-wrap gap-1 mt-2">
                               {b.issueCategories.map((c, i) => (
                                 <span key={i} className="text-xs px-2 py-0.5 rounded-full"
-                                  style={{ background: dark ? 'rgba(124,58,237,0.15)' : '#F3E8FF', color: dark ? '#C4B5FD' : '#7C3AED' }}>
+                                  style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.12)' }}>
                                   {c}
                                 </span>
                               ))}
@@ -827,7 +1037,7 @@ const AdminDashboard = () => {
                           <div className="p-3">
                             <div className="flex items-center gap-2 mb-2">
                               <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg"
-                                style={{ background: dark ? 'rgba(99,102,241,0.15)' : '#EEF2FF', color: dark ? '#A5B4FC' : '#4338CA' }}>
+                                style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.12)' }}>
                                 {b.vehicleNumber}
                               </span>
                               <span className={`text-xs ${textSecondary}`}>{b.serviceDate}</span>

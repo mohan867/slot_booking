@@ -100,7 +100,7 @@ const RemindersTab = (props) => {
                     {/* Summary Cards Row */}
                     <div className="grid grid-cols-3 gap-4">
                         {[
-                            { label: "Total Vehicles", value: reminders.length, color: "#22C55E", icon: ICONS.car },
+                            { label: "Total Vehicles", value: reminders.length, color: "#3B82F6", icon: ICONS.car },
                             { label: "Due Soon", value: reminders.filter(r => r.daysLeft >= 0 && r.daysLeft <= 7).length, color: "#FBBF24", icon: ICONS.clock },
                             { label: "Overdue", value: reminders.filter(r => r.daysLeft < 0).length, color: "#F87171", icon: ICONS.info },
                         ].map((item, i) => (

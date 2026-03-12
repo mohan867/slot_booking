@@ -121,12 +121,12 @@ const FeedbackTab = (props) => {
                         <div className="rounded-xl p-4"
                             style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>
                             <div className="text-xs font-medium mb-2" style={{ color: '#6B7A90' }}>Total Reviews</div>
-                            <div className="text-2xl font-black" style={{ color: '#22C55E' }}>{feedbacks.length}</div>
+                            <div className="text-2xl font-black" style={{ color: '#3B82F6' }}>{feedbacks.length}</div>
                         </div>
                         <div className="rounded-xl p-4"
                             style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>
                             <div className="text-xs font-medium mb-2" style={{ color: '#6B7A90' }}>5-Star Reviews</div>
-                            <div className="text-2xl font-black" style={{ color: '#4ADE80' }}>
+                            <div className="text-2xl font-black" style={{ color: '#60A5FA' }}>
                                 {feedbacks.filter(f => f.rating === 5).length}
                             </div>
                         </div>
@@ -142,8 +142,8 @@ const FeedbackTab = (props) => {
                                 <div className="p-5 pb-0">
                                     <div className="flex items-center gap-2 mb-1">
                                         <div className="w-8 h-8 rounded-lg flex items-center justify-center"
-                                            style={{ background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.2)' }}>
-                                            <Icon path={ICONS.book} className="w-4 h-4 text-green-400" />
+                                            style={{ background: 'rgba(37,99,235,0.1)', border: '1px solid rgba(37,99,235,0.2)' }}>
+                                            <Icon path={ICONS.book} className="w-4 h-4 text-blue-400" />
                                         </div>
                                         <h3 className="font-semibold text-sm text-white">Write a Review</h3>
                                     </div>
@@ -189,7 +189,7 @@ const FeedbackTab = (props) => {
                                                 color: '#E8ECF4',
                                                 minHeight: '100px',
                                             }}
-                                            onFocus={(e) => e.target.style.borderColor = 'rgba(34,197,94,0.4)'}
+                                            onFocus={(e) => e.target.style.borderColor = 'rgba(37,99,235,0.4)'}
                                             onBlur={(e) => e.target.style.borderColor = 'rgba(255,255,255,0.06)'}
                                             placeholder="Share your experience with us..."
                                             value={comment}
@@ -224,7 +224,7 @@ const FeedbackTab = (props) => {
                             <div className="flex items-center justify-between mb-1">
                                 <h3 className="font-semibold text-sm text-white">Recent Reviews</h3>
                                 <span className="text-xs px-2 py-0.5 rounded-full"
-                                    style={{ background: 'rgba(34,197,94,0.1)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.2)' }}>
+                                    style={{ background: 'rgba(37,99,235,0.1)', color: '#60A5FA', border: '1px solid rgba(37,99,235,0.2)' }}>
                                     {feedbacks.length} reviews
                                 </span>
                             </div>
@@ -240,7 +240,7 @@ const FeedbackTab = (props) => {
                                         <div className="flex justify-between items-start mb-3">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
-                                                    style={{ background: 'linear-gradient(135deg, #166534, #22C55E)' }}>
+                                                    style={{ background: 'linear-gradient(135deg, #1E40AF, #3B82F6)' }}>
                                                     {fb.avatar}
                                                 </div>
                                                 <div>

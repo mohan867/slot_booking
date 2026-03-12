@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Icon } from './Shared';
 
-const STAGES = ["Pending", "Accepted", "In Progress", "Completed"];
+const STAGES = ["Pending", "Accepted", "Assigned", "In Progress", "Completed"];
 
 const StatusTab = (props) => {
   const { dark, textPrimary, textSecondary, ICONS, cardClass, activeTab, bookings } = props;
@@ -9,8 +9,9 @@ const StatusTab = (props) => {
 
   const getStageIndex = (status) => {
     if (status === "Rejected") return -1;
-    if (status === "Completed") return 3;
-    if (status === "In Progress") return 2;
+    if (status === "Completed") return 4;
+    if (status === "In Progress") return 3;
+    if (status === "Assigned") return 2;
     if (status === "Accepted") return 1;
     return 0;
   };
@@ -19,6 +20,7 @@ const StatusTab = (props) => {
     const map = {
       "Pending": { bg: "rgba(251,191,36,0.1)", color: "#FBBF24", border: "rgba(251,191,36,0.2)" },
       "Accepted": { bg: "rgba(34,197,94,0.1)", color: "#4ADE80", border: "rgba(34,197,94,0.2)" },
+      "Assigned": { bg: "rgba(59,130,246,0.1)", color: "#60A5FA", border: "rgba(59,130,246,0.2)" },
       "In Progress": { bg: "rgba(249,115,22,0.1)", color: "#FB923C", border: "rgba(249,115,22,0.2)" },
       "Completed": { bg: "rgba(34,197,94,0.1)", color: "#22C55E", border: "rgba(34,197,94,0.2)" },
       "Rejected": { bg: "rgba(239,68,68,0.1)", color: "#F87171", border: "rgba(239,68,68,0.2)" },
@@ -111,8 +113,8 @@ const StatusTab = (props) => {
                 {!selectedBooking ? (
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-10">
                     <div className="w-20 h-20 rounded-2xl flex items-center justify-center mb-5"
-                      style={{ background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.15)' }}>
-                      <Icon path={ICONS.car} className="w-10 h-10" style={{ color: '#1E4D3A' }} />
+                      style={{ background: 'rgba(37,99,235,0.06)', border: '1px solid rgba(37,99,235,0.15)' }}>
+                      <Icon path={ICONS.car} className="w-10 h-10" style={{ color: '#1E40AF' }} />
                     </div>
                     <h3 className="font-bold text-lg mb-2 text-white">Select a booking</h3>
                     <p className="text-sm" style={{ color: '#6B7A90', maxWidth: 300 }}>
@@ -167,7 +169,7 @@ const StatusTab = (props) => {
                           <div className="flex justify-between items-end mb-3">
                             <span className="text-sm font-bold text-white">Service Progress</span>
                             <span className="text-xs font-bold" style={{ color: '#22C55E' }}>
-                              {Math.max(10, (getStageIndex(selectedBooking.status) + 1) * 25)}%
+                              {Math.max(10, (getStageIndex(selectedBooking.status) + 1) * 20)}%
                             </span>
                           </div>
                           <div className="h-2 w-full rounded-full overflow-hidden"
@@ -175,7 +177,7 @@ const StatusTab = (props) => {
                             <div
                               className="h-full rounded-full transition-all duration-1000 ease-out relative"
                               style={{
-                                width: `${Math.max(10, (getStageIndex(selectedBooking.status) + 1) * 25)}%`,
+                                width: `${Math.max(10, (getStageIndex(selectedBooking.status) + 1) * 20)}%`,
                                 background: "linear-gradient(90deg, #166534, #22C55E, #4ADE80)",
                                 boxShadow: "0 0 12px rgba(34,197,94,0.4)",
                               }}
@@ -194,6 +196,7 @@ const StatusTab = (props) => {
                             const stageColors = {
                               "Pending": "#FBBF24",
                               "Accepted": "#3B82F6",
+                              "Assigned": "#60A5FA",
                               "In Progress": "#F97316",
                               "Completed": "#22C55E",
                             };
@@ -202,7 +205,8 @@ const StatusTab = (props) => {
                             const messageMap = {
                               "Pending": "Your booking request is pending confirmation from the garage.",
                               "Accepted": "Booking accepted. The team is ready for your scheduled visit.",
-                              "In Progress": "Our mechanics are working on your vehicle right now.",
+                              "Assigned": "A technician has been assigned to your service.",
+                              "In Progress": "Our mechanic is working on your vehicle right now.",
                               "Completed": "Service complete! Your vehicle is ready for pickup.",
                             };
 

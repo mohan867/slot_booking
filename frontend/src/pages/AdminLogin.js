@@ -30,7 +30,7 @@ const ParticleCanvas = () => {
 
                 ctx.beginPath();
                 ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(139, 92, 246, ${p.alpha})`;
+                ctx.fillStyle = `rgba(34, 197, 94, ${p.alpha})`;
                 ctx.fill();
             });
 
@@ -42,7 +42,7 @@ const ParticleCanvas = () => {
                         ctx.beginPath();
                         ctx.moveTo(a.x, a.y);
                         ctx.lineTo(b.x, b.y);
-                        ctx.strokeStyle = `rgba(139, 92, 246, ${0.08 * (1 - dist / 100)})`;
+                        ctx.strokeStyle = `rgba(34, 197, 94, ${0.08 * (1 - dist / 100)})`;
                         ctx.lineWidth = 0.5;
                         ctx.stroke();
                     }
@@ -155,7 +155,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
         <div
             className="min-h-screen flex relative overflow-hidden"
             style={{
-                background: "radial-gradient(ellipse at 30% 20%, rgba(124,58,237,0.25) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(79,70,229,0.2) 0%, transparent 50%), linear-gradient(135deg, #030712 0%, #0A0416 40%, #0D0A1E 100%)",
+                background: "radial-gradient(ellipse at 30% 20%, rgba(34,197,94,0.15) 0%, transparent 50%), radial-gradient(ellipse at 70% 80%, rgba(16,185,129,0.12) 0%, transparent 50%), linear-gradient(135deg, #030712 0%, #041410 40%, #051A12 100%)",
             }}
         >
             {/* Animated particle background */}
@@ -165,8 +165,8 @@ function AdminLogin({ setUser, onSwitchToUser }) {
             <div
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                    backgroundImage: `linear-gradient(rgba(124,58,237,0.04) 1px, transparent 1px),
-                            linear-gradient(90deg, rgba(124,58,237,0.04) 1px, transparent 1px)`,
+                    backgroundImage: `linear-gradient(rgba(34,197,94,0.04) 1px, transparent 1px),
+                            linear-gradient(90deg, rgba(34,197,94,0.04) 1px, transparent 1px)`,
                     backgroundSize: "50px 50px",
                     zIndex: 1,
                 }}
@@ -176,15 +176,15 @@ function AdminLogin({ setUser, onSwitchToUser }) {
             <div className="absolute pointer-events-none" style={{ zIndex: 1 }}>
                 <div
                     className="absolute -top-32 -left-32 w-96 h-96 rounded-full animate-blob"
-                    style={{ background: "radial-gradient(circle, rgba(124,58,237,0.3) 0%, transparent 70%)" }}
+                    style={{ background: "radial-gradient(circle, rgba(34,197,94,0.2) 0%, transparent 70%)" }}
                 />
                 <div
                     className="absolute bottom-0 right-0 w-96 h-96 rounded-full animate-blob animation-delay-2000"
-                    style={{ background: "radial-gradient(circle, rgba(79,70,229,0.25) 0%, transparent 70%)" }}
+                    style={{ background: "radial-gradient(circle, rgba(16,185,129,0.18) 0%, transparent 70%)" }}
                 />
                 <div
                     className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full animate-blob animation-delay-4000"
-                    style={{ background: "radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 70%)" }}
+                    style={{ background: "radial-gradient(circle, rgba(74,222,128,0.1) 0%, transparent 70%)" }}
                 />
             </div>
 
@@ -197,13 +197,13 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                 <div className="flex items-center gap-3">
                     <div
                         className="w-12 h-12 rounded-2xl flex items-center justify-center"
-                        style={{ background: "linear-gradient(135deg, #7C3AED, #4F46E5)", boxShadow: "0 8px 32px rgba(124,58,237,0.4)" }}
+                        style={{ background: "linear-gradient(135deg, #166534, #22C55E)", boxShadow: "0 8px 32px rgba(34,197,94,0.4)" }}
                     >
                         <ShieldIcon size={24} />
                     </div>
                     <div>
                         <div className="text-white font-bold text-lg tracking-tight">RMK Garage</div>
-                        <div className="text-xs" style={{ color: "#8B5CF6" }}>Admin Control Panel</div>
+                        <div className="text-xs" style={{ color: "#4ADE80" }}>Admin Control Panel</div>
                     </div>
                 </div>
 
@@ -212,9 +212,9 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                     <div>
                         <div
                             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold mb-6"
-                            style={{ background: "rgba(124,58,237,0.15)", color: "#A78BFA", border: "1px solid rgba(124,58,237,0.3)" }}
+                            style={{ background: "rgba(34,197,94,0.1)", color: "#4ADE80", border: "1px solid rgba(34,197,94,0.2)" }}
                         >
-                            <span className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-pulse inline-block" />
+                            <span className="w-1.5 h-1.5 rounded-full animate-pulse inline-block" style={{ background: '#4ADE80' }} />
                             Secure Administrator Zone
                         </div>
                         <h1 className="text-4xl font-black text-white leading-tight mb-4">
@@ -222,7 +222,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                             <span
                                 className="block"
                                 style={{
-                                    background: "linear-gradient(135deg, #A78BFA, #60A5FA)",
+                                    background: "linear-gradient(135deg, #4ADE80, #22C55E)",
                                     WebkitBackgroundClip: "text",
                                     WebkitTextFillColor: "transparent",
                                     backgroundClip: "text",
@@ -248,7 +248,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                 className="flex items-center gap-4 p-4 rounded-2xl transition-all"
                                 style={{
                                     background: "rgba(255,255,255,0.03)",
-                                    border: "1px solid rgba(124,58,237,0.15)",
+                                    border: "1px solid rgba(34,197,94,0.12)",
                                     animationDelay: `${i * 100}ms`,
                                 }}
                             >
@@ -265,9 +265,9 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                 {/* Live clock */}
                 <div
                     className="p-4 rounded-2xl"
-                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(124,58,237,0.15)" }}
+                    style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(34,197,94,0.12)" }}
                 >
-                    <div className="text-3xl font-black tracking-widest mb-1" style={{ color: "#A78BFA", fontVariantNumeric: "tabular-nums" }}>
+                    <div className="text-3xl font-black tracking-widest mb-1" style={{ color: "#4ADE80", fontVariantNumeric: "tabular-nums" }}>
                         {timeStr}
                     </div>
                     <div className="text-xs" style={{ color: "#4B5563" }}>{dateStr}</div>
@@ -284,13 +284,13 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                     <div className="lg:hidden flex items-center gap-3 mb-8">
                         <div
                             className="w-10 h-10 rounded-xl flex items-center justify-center"
-                            style={{ background: "linear-gradient(135deg, #7C3AED, #4F46E5)" }}
+                            style={{ background: "linear-gradient(135deg, #166534, #22C55E)" }}
                         >
                             <ShieldIcon size={20} />
                         </div>
                         <div>
                             <div className="text-white font-bold">RMK Admin Portal</div>
-                            <div className="text-xs" style={{ color: "#7C3AED" }}>Secure Access</div>
+                            <div className="text-xs" style={{ color: "#4ADE80" }}>Secure Access</div>
                         </div>
                     </div>
 
@@ -300,7 +300,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                             background: "rgba(255,255,255,0.04)",
                             backdropFilter: "blur(40px)",
                             WebkitBackdropFilter: "blur(40px)",
-                            border: "1px solid rgba(124,58,237,0.2)",
+                            border: "1px solid rgba(34,197,94,0.15)",
                             borderRadius: 28,
                             boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.05) inset, 0 1px 0 rgba(255,255,255,0.1) inset",
                         }}
@@ -308,14 +308,14 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                         {/* Card header */}
                         <div
                             className="px-8 pt-8 pb-6"
-                            style={{ borderBottom: "1px solid rgba(124,58,237,0.15)" }}
+                            style={{ borderBottom: "1px solid rgba(34,197,94,0.12)" }}
                         >
                             <div className="flex items-center gap-4 mb-5">
                                 <div
                                     className="w-14 h-14 rounded-2xl flex items-center justify-center animate-pulse-glow"
                                     style={{
-                                        background: "linear-gradient(135deg, #7C3AED, #4F46E5)",
-                                        boxShadow: "0 8px 30px rgba(124,58,237,0.5)",
+                                        background: "linear-gradient(135deg, #166534, #22C55E)",
+                                        boxShadow: "0 8px 30px rgba(34,197,94,0.4)",
                                     }}
                                 >
                                     <ShieldIcon size={28} />
@@ -329,13 +329,13 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                             {/* Security badge */}
                             <div
                                 className="flex items-center gap-2 p-3 rounded-xl"
-                                style={{ background: "rgba(124,58,237,0.1)", border: "1px solid rgba(124,58,237,0.2)" }}
+                                style={{ background: "rgba(34,197,94,0.08)", border: "1px solid rgba(34,197,94,0.15)" }}
                             >
-                                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="#A78BFA" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="#4ADE80" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                                         d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                                 </svg>
-                                <span className="text-xs" style={{ color: "#8B5CF6" }}>
+                                <span className="text-xs" style={{ color: "#4ADE80" }}>
                                     🔒 End-to-end encrypted · Session protected · Access logged
                                 </span>
                             </div>
@@ -348,7 +348,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                 <div className="relative">
                                     <div
                                         className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"
-                                        style={{ color: focused.email ? "#8B5CF6" : "#4B5563" }}
+                                        style={{ color: focused.email ? "#4ADE80" : "#4B5563" }}
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -368,15 +368,15 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                         autoComplete="email"
                                         className="w-full pl-11 pr-4 py-3.5 text-sm text-white placeholder-gray-600 rounded-xl transition-all duration-200 outline-none"
                                         style={{
-                                            background: focused.email ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.04)",
-                                            border: focused.email ? "1px solid rgba(124,58,237,0.6)" : "1px solid rgba(255,255,255,0.08)",
-                                            boxShadow: focused.email ? "0 0 0 3px rgba(124,58,237,0.15)" : "none",
+                                            background: focused.email ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.04)",
+                                            border: focused.email ? "1px solid rgba(34,197,94,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                                            boxShadow: focused.email ? "0 0 0 3px rgba(34,197,94,0.12)" : "none",
                                         }}
                                     />
                                     {focused.email && (
                                         <div
                                             className="absolute -top-2.5 left-3 text-xs font-bold px-1"
-                                            style={{ color: "#8B5CF6", background: "#0A0416" }}
+                                            style={{ color: "#4ADE80", background: "#041410" }}
                                         >
                                             ADMIN EMAIL
                                         </div>
@@ -387,7 +387,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                 <div className="relative">
                                     <div
                                         className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none"
-                                        style={{ color: focused.password ? "#8B5CF6" : "#4B5563" }}
+                                        style={{ color: focused.password ? "#4ADE80" : "#4B5563" }}
                                     >
                                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
@@ -407,15 +407,15 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                         autoComplete="current-password"
                                         className="w-full pl-11 pr-12 py-3.5 text-sm text-white placeholder-gray-600 rounded-xl transition-all duration-200 outline-none"
                                         style={{
-                                            background: focused.password ? "rgba(124,58,237,0.12)" : "rgba(255,255,255,0.04)",
-                                            border: focused.password ? "1px solid rgba(124,58,237,0.6)" : "1px solid rgba(255,255,255,0.08)",
-                                            boxShadow: focused.password ? "0 0 0 3px rgba(124,58,237,0.15)" : "none",
+                                            background: focused.password ? "rgba(34,197,94,0.08)" : "rgba(255,255,255,0.04)",
+                                            border: focused.password ? "1px solid rgba(34,197,94,0.5)" : "1px solid rgba(255,255,255,0.08)",
+                                            boxShadow: focused.password ? "0 0 0 3px rgba(34,197,94,0.12)" : "none",
                                         }}
                                     />
                                     {focused.password && (
                                         <div
                                             className="absolute -top-2.5 left-3 text-xs font-bold px-1"
-                                            style={{ color: "#8B5CF6", background: "#0A0416" }}
+                                            style={{ color: "#4ADE80", background: "#041410" }}
                                         >
                                             PASSWORD
                                         </div>
@@ -424,7 +424,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                         type="button"
                                         onClick={() => setShowPassword(!showPassword)}
                                         className="absolute right-4 top-1/2 -translate-y-1/2 transition-colors"
-                                        style={{ color: showPassword ? "#8B5CF6" : "#4B5563" }}
+                                        style={{ color: showPassword ? "#4ADE80" : "#4B5563" }}
                                     >
                                         {showPassword ? (
                                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -474,10 +474,10 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                     className="w-full relative overflow-hidden flex items-center justify-center gap-2 py-4 rounded-xl font-bold text-sm text-white transition-all duration-300"
                                     style={{
                                         background: loading
-                                            ? "rgba(124,58,237,0.5)"
-                                            : "linear-gradient(135deg, #7C3AED 0%, #6D28D9 50%, #4F46E5 100%)",
-                                        boxShadow: loading ? "none" : "0 8px 32px rgba(124,58,237,0.5)",
-                                        border: "1px solid rgba(167,139,250,0.3)",
+                                            ? "rgba(34,197,94,0.4)"
+                                            : "linear-gradient(135deg, #166534 0%, #15803D 50%, #22C55E 100%)",
+                                        boxShadow: loading ? "none" : "0 8px 32px rgba(34,197,94,0.4)",
+                                        border: "1px solid rgba(74,222,128,0.25)",
                                     }}
                                 >
                                     {/* Shimmer */}
@@ -518,12 +518,12 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                 <div className="mt-4">
                                     <div
                                         className="h-0.5 rounded-full overflow-hidden"
-                                        style={{ background: "rgba(124,58,237,0.2)" }}
+                                        style={{ background: "rgba(34,197,94,0.15)" }}
                                     >
                                         <div
                                             className="h-full rounded-full animate-gradient"
                                             style={{
-                                                background: "linear-gradient(90deg, #7C3AED, #A78BFA, #7C3AED)",
+                                                background: "linear-gradient(90deg, #22C55E, #4ADE80, #22C55E)",
                                                 backgroundSize: "200% 100%",
                                                 width: "60%",
                                                 animation: "shimmer 1s infinite",
@@ -537,7 +537,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                         {/* Card footer */}
                         <div
                             className="px-8 pb-8"
-                            style={{ borderTop: "1px solid rgba(124,58,237,0.1)" }}
+                            style={{ borderTop: "1px solid rgba(34,197,94,0.08)" }}
                         >
                             <div className="pt-6 flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs" style={{ color: "#4B5563" }}>
@@ -549,7 +549,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
                                     onClick={onSwitchToUser}
                                     className="text-xs font-medium transition-colors flex items-center gap-1.5"
                                     style={{ color: "#6B7280" }}
-                                    onMouseEnter={e => { e.currentTarget.style.color = "#A78BFA"; }}
+                                    onMouseEnter={e => { e.currentTarget.style.color = "#4ADE80"; }}
                                     onMouseLeave={e => { e.currentTarget.style.color = "#6B7280"; }}
                                 >
                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

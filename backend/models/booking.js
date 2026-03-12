@@ -46,9 +46,35 @@ const bookingSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    // Staff assignment
+    staffId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Staff",
+      default: null
+    },
+    assignedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null
+    },
+    assignedAt: {
+      type: Date,
+      default: null
+    },
+    // Payment
+    amount: {
+      type: Number,
+      default: 0
+    },
+    paymentStatus: {
+      type: String,
+      enum: ["Unpaid", "Paid"],
+      default: "Unpaid"
+    },
+    // Full status flow
     status: {
       type: String,
-      enum: ["Pending", "Accepted", "Rejected"], // 🔥 professional
+      enum: ["Pending", "Accepted", "Rejected", "Assigned", "In Progress", "Completed"],
       default: "Pending"
     }
   },

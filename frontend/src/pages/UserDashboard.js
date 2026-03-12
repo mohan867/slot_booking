@@ -74,10 +74,16 @@ const ISSUE_CATEGORIES = ["Oil Change", "Brake Service", "Engine Problem", "Tire
 
 const getStatusBadge = (status, dark = true) => {
   if (dark) {
-    const map = { Pending: "badge-pending", Accepted: "badge-accepted", Rejected: "badge-rejected" };
+    const map = {
+      Pending: "badge-pending", Accepted: "badge-accepted", Rejected: "badge-rejected",
+      Assigned: "badge-assigned", "In Progress": "badge-inprogress", Completed: "badge-completed"
+    };
     return map[status] || "badge-pending";
   }
-  const map = { Pending: "badge-pending-light", Accepted: "badge-accepted-light", Rejected: "badge-rejected-light" };
+  const map = {
+    Pending: "badge-pending-light", Accepted: "badge-accepted-light", Rejected: "badge-rejected-light",
+    Assigned: "badge-assigned-light", "In Progress": "badge-inprogress-light", Completed: "badge-completed-light"
+  };
   return map[status] || "badge-pending-light";
 };
 
@@ -118,9 +124,9 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, userData, sideba
         lg:translate-x-0
       `}>
         {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-6" style={{ borderBottom: dark ? "1px solid rgba(255,255,255,0.05)" : "1px solid rgba(0,0,0,0.06)" }}>
+        <div className="flex items-center gap-3 px-6 py-6" style={{ borderBottom: dark ? "1px solid rgba(37,99,235,0.08)" : "1px solid rgba(0,0,0,0.06)" }}>
           <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, #166534, #22C55E)", boxShadow: "0 4px 16px rgba(34,197,94,0.25)" }}>
+            style={{ background: "linear-gradient(135deg, #2563EB, #3B82F6)", boxShadow: "0 4px 16px rgba(37,99,235,0.35)" }}>
             <Icon path={ICONS.lightning} className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -151,19 +157,19 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, userData, sideba
               <Icon path={item.icon} className="w-5 h-5 flex-shrink-0" />
               {item.label}
               {activeTab === item.id && (
-                <span className="ml-auto w-2 h-2 rounded-full" style={{ background: "#22C55E", boxShadow: "0 0 8px rgba(34,197,94,0.5)" }} />
+                <span className="ml-auto w-2 h-2 rounded-full" style={{ background: "#3B82F6", boxShadow: "0 0 8px rgba(59,130,246,0.5)" }} />
               )}
             </button>
           ))}
         </nav>
 
         {/* User & Logout */}
-        <div className="px-3 pb-6 space-y-2" style={{ borderTop: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)", paddingTop: "16px" }}>
+        <div className="px-3 pb-6 space-y-2" style={{ borderTop: dark ? "1px solid rgba(37,99,235,0.08)" : "1px solid rgba(0,0,0,0.06)", paddingTop: "16px" }}>
           {/* User info */}
           <div className={`flex items-center gap-3 px-3 py-3 rounded-12`}
             style={{ borderRadius: 12 }}>
             <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #22C55E, #4ADE80)" }}>
+              style={{ background: "linear-gradient(135deg, #2563EB, #3B82F6)" }}>
               {(userData?.name || "U")[0].toUpperCase()}
             </div>
             <div className="min-w-0">
@@ -465,6 +471,9 @@ const UserDashboard = () => {
     pending: bookings.filter(b => b.status === "Pending").length,
     accepted: bookings.filter(b => b.status === "Accepted").length,
     rejected: bookings.filter(b => b.status === "Rejected").length,
+    assigned: bookings.filter(b => b.status === "Assigned").length,
+    inProgress: bookings.filter(b => b.status === "In Progress").length,
+    completed: bookings.filter(b => b.status === "Completed").length,
   };
 
   /* ── Styles ── */
@@ -503,9 +512,9 @@ const UserDashboard = () => {
         {/* Top Bar */}
         <header className={`sticky top-0 z-10 flex items-center justify-between px-6 py-4 ${dark ? "border-b border-white/5" : "border-b border-black/5"
           }`} style={{
-            background: dark ? "rgba(11,15,25,0.92)" : "rgba(240,244,255,0.85)",
+            background: dark ? "rgba(15,23,42,0.92)" : "rgba(240,244,255,0.85)",
             backdropFilter: "blur(24px)",
-            borderBottom: dark ? '1px solid rgba(255,255,255,0.04)' : undefined,
+            borderBottom: dark ? '1px solid rgba(37,99,235,0.06)' : undefined,
           }}>
           <div className="flex items-center gap-4">
             {/* Hamburger */}
@@ -515,12 +524,11 @@ const UserDashboard = () => {
             </button>
             <div>
               <h1 className={`text-lg font-bold ${textPrimary}`}>
-                {activeTab === "dashboard" && "Dashboard"}
-                {activeTab === "book" && "Book Service"}
-                {activeTab === "bookings" && "My Bookings"}
-                {activeTab === "status" && "Service Status"}
-                {activeTab === "reminders" && "Reminders"}
-                {activeTab === "feedback" && "Feedback"}
+                {(() => {
+                  const hour = new Date().getHours();
+                  const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+                  return `${greeting}, ${userData?.name || "User"} 👋`;
+                })()}
               </h1>
               <p className={`text-xs ${textSecondary}`}>
                 {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
@@ -528,14 +536,19 @@ const UserDashboard = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Notification Bell */}
+            <button className="notification-bell">
+              <Icon path={ICONS.bell} className="w-5 h-5" />
+              {bookings.filter(b => b.status === "Pending").length > 0 && <span className="notification-dot" />}
+            </button>
             {/* Theme Toggle */}
             <button
               onClick={() => setDark(!dark)}
               className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
               style={{
-                background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)',
-                border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)',
-                color: dark ? '#6B7A90' : '#94A3B8',
+                background: dark ? 'rgba(37,99,235,0.06)' : 'rgba(0,0,0,0.05)',
+                border: dark ? '1px solid rgba(37,99,235,0.1)' : '1px solid rgba(0,0,0,0.08)',
+                color: dark ? '#94A3B8' : '#94A3B8',
               }}
             >
               <Icon path={dark ? ICONS.sun : ICONS.moon} className="w-4 h-4" />
@@ -543,10 +556,10 @@ const UserDashboard = () => {
             {/* Book quick-action */}
             <button
               onClick={() => setActiveTab("book")}
-              className="btn-primary flex items-center gap-2 py-2 px-4 text-sm"
+              className="btn-primary flex items-center gap-2 py-2.5 px-5 text-sm"
             >
               <Icon path={ICONS.plus} className="w-4 h-4" />
-              <span className="hidden sm:inline">New Booking</span>
+              <span className="hidden sm:inline">+ New Booking</span>
             </button>
           </div>
         </header>

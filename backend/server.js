@@ -9,12 +9,15 @@ const session = require("express-session");
 const authRoutes = require("./routes/authRoutes");
 const bookingRoutes = require("./routes/bookingRoutes");
 const adminRoutes = require("./routes/adminRoutes");
+const staffRoutes = require("./routes/staffRoutes");
+const staffAuthRoutes = require("./routes/staffAuthRoutes");
+const staffTaskRoutes = require("./routes/staffTaskRoutes");
 
 const app = express();
 
 // ================= MIDDLEWARE =================
 app.use(cors({
-  origin: ["http://localhost:3000", "http://localhost:3001"], // Allow both frontend ports
+  origin: ["http://localhost:3000", "http://localhost:3001", "http://localhost:3002"],
   credentials: true
 }));
 app.use(express.json());
@@ -40,6 +43,9 @@ mongoose.connect(process.env.MONGO_URI)
 app.use("/api/auth", authRoutes);
 app.use("/api/bookings", bookingRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/staff", staffRoutes);
+app.use("/api/staff-auth", staffAuthRoutes);
+app.use("/api/staff-tasks", staffTaskRoutes);
 
 // ================= TEST ROUTE =================
 app.get("/", (req, res) => {

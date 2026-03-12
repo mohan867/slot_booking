@@ -56,15 +56,15 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
       {/* Animated background orbs */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -left-40 w-96 h-96 rounded-full animate-blob"
-          style={{ background: "radial-gradient(circle, rgba(37,99,235,0.35) 0%, transparent 70%)" }} />
+          style={{ background: "radial-gradient(circle, rgba(34,197,94,0.25) 0%, transparent 70%)" }} />
         <div className="absolute top-1/4 -right-20 w-80 h-80 rounded-full animate-blob animation-delay-2000"
-          style={{ background: "radial-gradient(circle, rgba(56,189,248,0.25) 0%, transparent 70%)" }} />
+          style={{ background: "radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)" }} />
         <div className="absolute -bottom-32 left-1/3 w-96 h-96 rounded-full animate-blob animation-delay-4000"
-          style={{ background: "radial-gradient(circle, rgba(99,102,241,0.2) 0%, transparent 70%)" }} />
+          style={{ background: "radial-gradient(circle, rgba(74,222,128,0.15) 0%, transparent 70%)" }} />
         {/* Grid lines */}
         <div className="absolute inset-0 opacity-5"
           style={{
-            backgroundImage: `linear-gradient(rgba(37,99,235,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(37,99,235,0.3) 1px, transparent 1px)`,
+            backgroundImage: `linear-gradient(rgba(34,197,94,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(34,197,94,0.3) 1px, transparent 1px)`,
             backgroundSize: '60px 60px'
           }} />
       </div>
@@ -100,7 +100,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
                 }`}
               style={isLogin ? {
                 background: "linear-gradient(135deg, #22C55E, #16A34A)",
-                boxShadow: "0 4px 16px rgba(37,99,235,0.35)"
+                boxShadow: "0 4px 16px rgba(34,197,94,0.35)"
               } : {}}
             >
               Sign In
@@ -114,7 +114,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
                 }`}
               style={!isLogin ? {
                 background: "linear-gradient(135deg, #22C55E, #16A34A)",
-                boxShadow: "0 4px 16px rgba(37,99,235,0.35)"
+                boxShadow: "0 4px 16px rgba(34,197,94,0.35)"
               } : {}}
             >
               Create Account
@@ -305,7 +305,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
               onClick={onSwitchToAdmin}
               className="flex items-center gap-1.5 text-xs font-medium transition-colors ml-auto"
               style={{ color: "#475569" }}
-              onMouseEnter={e => e.currentTarget.style.color = "#A78BFA"}
+              onMouseEnter={e => e.currentTarget.style.color = "#4ADE80"}
               onMouseLeave={e => e.currentTarget.style.color = "#475569"}
             >
               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">

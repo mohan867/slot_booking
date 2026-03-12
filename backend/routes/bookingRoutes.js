@@ -132,7 +132,9 @@ router.get("/user", isAuthenticated, async (req, res) => {
   try {
     const bookings = await Booking.find({
       userId: req.session.user.id
-    }).sort({ createdAt: -1 });
+    })
+      .populate("staffId", "name phone specialization")
+      .sort({ createdAt: -1 });
 
     res.status(200).json(bookings);
   } catch (error) {
