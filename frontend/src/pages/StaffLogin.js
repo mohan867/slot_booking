@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import API from "../services/api";
+import { loginStaff } from "../services/firebaseService";
 
 /* ── Wrench icon for staff ──────────────────────────────── */
 const WrenchIcon = ({ size = 48 }) => (
@@ -105,7 +105,7 @@ function StaffLogin({ setUser, onBack }) {
     setMsg("");
 
     try {
-      const res = await API.post("/staff-auth/login", {
+      const loggedUser = await loginStaff({
         email: formData.email,
         password: formData.password,
       });
@@ -114,11 +114,11 @@ function StaffLogin({ setUser, onBack }) {
       setMsg("Authentication successful. Redirecting to staff panel...");
 
       setTimeout(() => {
-        setUser(res.data.user);
+        setUser(loggedUser);
       }, 1000);
     } catch (err) {
       setMsgType("error");
-      setMsg(err.response?.data?.message || "Authentication failed. Please try again.");
+      setMsg(err.message || "Authentication failed. Please try again.");
     } finally {
       setLoading(false);
     }

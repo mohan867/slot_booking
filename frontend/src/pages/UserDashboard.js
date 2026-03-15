@@ -1,5 +1,13 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import API from "../services/api";
+import { 
+  logoutUser, 
+  getCurrentUserProfile, 
+  listenUserBookings,
+  getAvailableSlots,
+  createBooking,
+  cancelBooking,
+  rescheduleBooking
+} from "../services/firebaseService";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import DashboardTab from '../components/UserDashboard/DashboardTab';
@@ -304,7 +312,7 @@ const UserDashboard = () => {
         // Shop marker
         const shopIcon = L.divIcon({
           html: `<div style="background:linear-gradient(135deg,#059669,#10B981);width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 10px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
           </div>`,
           className: '', iconSize: [36, 36], iconAnchor: [18, 36]
         });
@@ -352,19 +360,33 @@ const UserDashboard = () => {
     );
   };
 
-  useEffect(() => { fetchUserData(); fetchBookings(); }, []);
-  useEffect(() => { if (formData.serviceDate) fetchAvailableSlots(formData.serviceDate); }, [formData.serviceDate]);
+  useEffect(() => { 
+    fetchUserData(); 
+
+    // ✅ Real-time data listener replaces fetchBookings
+    const unsubscribe = listenUserBookings((data) => {
+      setBookings(data);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  useEffect(() => { 
+    if (formData.serviceDate) fetchAvailableSlots(formData.serviceDate); 
+  }, [formData.serviceDate]);
 
   const fetchUserData = async () => {
-    try { const res = await API.get("/auth/me"); setUserData(res.data); } catch { }
-  };
-
-  const fetchBookings = async () => {
-    try { const res = await API.get("/bookings/user"); setBookings(res.data); } catch { }
+    try { 
+      const profile = await getCurrentUserProfile(); 
+      setUserData(profile); 
+    } catch { }
   };
 
   const fetchAvailableSlots = async (date) => {
-    try { const res = await API.get(`/bookings/available-slots?date=${date}`); setAvailableSlots(res.data.slots); }
+    try { 
+      const slots = await getAvailableSlots(date);
+      setAvailableSlots(slots); 
+    }
     catch { setAvailableSlots([]); }
   };
 
@@ -418,15 +440,14 @@ const UserDashboard = () => {
         payload.doorstepCharge = formData.doorstepCharge;
         payload.distanceKm = formData.distanceKm;
       }
-      console.log('Booking payload:', JSON.stringify(payload));
-      await API.post("/bookings/create", payload);
+      
+      await createBooking(payload);
       showMessage("Booking created successfully! 🎉", "success");
       setFormData({ vehicleNumber: "", serviceDate: "", serviceTime: "", issue: "", issueCategories: [], doorstepDelivery: false, pickupLocation: null, doorstepCharge: 0, distanceKm: 0 });
       setAvailableSlots([]);
-      fetchBookings();
       setTimeout(() => setActiveTab("bookings"), 1500);
     } catch (err) {
-      showMessage(err.response?.data?.message || "Failed to create booking", "error");
+      showMessage(err.message || "Failed to create booking", "error");
     } finally { setLoading(false); }
   };
 
@@ -434,30 +455,29 @@ const UserDashboard = () => {
     if (!window.confirm("Cancel this booking?")) return;
     setLoading(true);
     try {
-      await API.delete(`/bookings/cancel/${id}`);
+      await cancelBooking(id);
       showMessage("Booking cancelled successfully!", "success");
-      fetchBookings();
     } catch (err) {
-      showMessage(err.response?.data?.message || "Failed to cancel", "error");
+      showMessage(err.message || "Failed to cancel", "error");
     } finally { setLoading(false); }
   };
 
   const handleReschedule = async () => {
     setLoading(true);
     try {
-      await API.put(`/bookings/update/${rescheduleModal.booking._id}`, {
-        serviceDate: rescheduleModal.newDate, serviceTime: rescheduleModal.newTime
+      await rescheduleBooking(rescheduleModal.booking._id, {
+        serviceDate: rescheduleModal.newDate, 
+        serviceTime: rescheduleModal.newTime
       });
       showMessage("Booking rescheduled successfully!", "success");
       setRescheduleModal({ isOpen: false, booking: null, newDate: "", newTime: "" });
-      fetchBookings();
     } catch (err) {
-      showMessage(err.response?.data?.message || "Failed to reschedule", "error");
+      showMessage(err.message || "Failed to reschedule", "error");
     } finally { setLoading(false); }
   };
 
   const handleLogout = async () => {
-    try { await API.post("/auth/logout"); } catch { }
+    try { await logoutUser(); } catch { }
     window.location.reload();
   };
 

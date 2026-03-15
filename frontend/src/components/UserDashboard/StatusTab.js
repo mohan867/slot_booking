@@ -69,10 +69,10 @@ const StatusTab = (props) => {
                 </div>
                 <div className="space-y-3 max-h-[600px] overflow-y-auto pr-1 custom-scrollbar">
                   {bookings.map((b) => {
-                    const isSelected = selectedBooking?._id === b._id;
+                    const isSelected = selectedBooking?.id === b.id;
                     return (
                       <div
-                        key={b._id}
+                        key={b.id}
                         onClick={() => setSelectedBooking(b)}
                         className="p-4 rounded-xl cursor-pointer transition-all duration-300"
                         style={{
@@ -84,7 +84,7 @@ const StatusTab = (props) => {
                       >
                         <div className="flex justify-between items-start mb-2">
                           <div>
-                            <p className="text-xs font-mono mb-1" style={{ color: '#3D4A5C' }}>#{b._id.slice(-6).toUpperCase()}</p>
+                            <p className="text-xs font-mono mb-1" style={{ color: '#3D4A5C' }}>#{b.id.slice(-6).toUpperCase()}</p>
                             <h4 className="font-bold text-sm text-white">{b.vehicleNumber}</h4>
                           </div>
                           {getStatusBadge(b.status)}
@@ -128,7 +128,7 @@ const StatusTab = (props) => {
                       <div>
                         <h3 className="text-xl font-bold text-white mb-1">Service Tracking</h3>
                         <p className="text-sm" style={{ color: '#6B7A90' }}>
-                          Booking #{selectedBooking._id.slice(-6).toUpperCase()}
+                          Booking #{selectedBooking.id.slice(-6).toUpperCase()}
                         </p>
                       </div>
                       {getStatusBadge(selectedBooking.status)}

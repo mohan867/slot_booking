@@ -74,7 +74,7 @@ const AdminBookingsTab = (props) => {
                       </thead>
                       <tbody>
                         {filteredBookings.map((b, idx) => (
-                          <tr key={b._id} onClick={() => setSelectedBooking(b)}
+                          <tr key={b.id} onClick={() => setSelectedBooking(b)}
                             className="cursor-pointer" style={{ transition: 'background 0.15s' }}>
                             <td className="font-mono text-xs" style={{ color: '#3d4a5c' }}>
                               #{(idx + 1).toString().padStart(3, "0")}

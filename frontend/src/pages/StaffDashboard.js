@@ -1,5 +1,10 @@
 import React, { useEffect, useState } from "react";
-import API from "../services/api";
+import { 
+  logoutUser, 
+  getCurrentUserProfile, 
+  listenStaffBookings, 
+  updateBookingProgress 
+} from "../services/firebaseService";
 
 const Icon = ({ path, className = "w-5 h-5", style }) => (
   <svg className={className} style={style} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -39,7 +44,7 @@ const getStatusColor = (status) => {
 
 const getNextAction = (status) => {
   const map = {
-    Assigned: { label: "Accept Task", nextStatus: null, action: "accept", color: "#3B82F6", gradient: "linear-gradient(135deg, #1E40AF, #3B82F6)" },
+    Assigned: { label: "Accept Task", nextStatus: "Accepted", action: "update", color: "#3B82F6", gradient: "linear-gradient(135deg, #1E40AF, #3B82F6)" },
     Accepted: { label: "Start Service", nextStatus: "In Progress", action: "update", color: "#8B5CF6", gradient: "linear-gradient(135deg, #6D28D9, #8B5CF6)" },
     "In Progress": { label: "Mark Completed", nextStatus: "Completed", action: "update", color: "#10B981", gradient: "linear-gradient(135deg, #047857, #10B981)" },
   };
@@ -56,55 +61,33 @@ const StaffDashboard = () => {
 
   useEffect(() => {
     fetchProfile();
-    fetchTasks();
-  }, []);
-
-  // Auto-refresh tasks every 15 seconds so new assignments appear automatically
-  useEffect(() => {
-    const interval = setInterval(() => {
-      API.get("/staff-tasks/my-tasks").then(res => setTasks(res.data)).catch(() => {});
-    }, 15000);
-    return () => clearInterval(interval);
+    const unsub = listenStaffBookings(setTasks);
+    return () => unsub();
   }, []);
 
   const fetchProfile = async () => {
     try {
-      const res = await API.get("/staff-auth/profile");
-      setStaffInfo(res.data);
-    } catch (e) { console.error(e); }
-  };
-
-  const fetchTasks = async () => {
-    setLoading(true);
-    try {
-      const res = await API.get("/staff-tasks/my-tasks");
-      setTasks(res.data);
-    } catch (e) { console.error(e); }
-    finally { setLoading(false); }
-  };
-
-  const acceptTask = async (bookingId) => {
-    setActionLoading(bookingId);
-    try {
-      const res = await API.put(`/staff-tasks/accept/${bookingId}`);
-      setTasks(prev => prev.map(t => t._id === bookingId ? res.data.booking : t));
-      if (selectedTask && selectedTask._id === bookingId) setSelectedTask(res.data.booking);
-    } catch (e) { console.error(e); }
-    finally { setActionLoading(null); }
+      const profile = await getCurrentUserProfile();
+      setStaffInfo(profile);
+    } catch { }
   };
 
   const updateTaskStatus = async (bookingId, status) => {
     setActionLoading(bookingId);
     try {
-      const res = await API.put(`/staff-tasks/update-status/${bookingId}`, { status });
-      setTasks(prev => prev.map(t => t._id === bookingId ? res.data.booking : t));
-      if (selectedTask && selectedTask._id === bookingId) setSelectedTask(res.data.booking);
-    } catch (e) { console.error(e); }
-    finally { setActionLoading(null); }
+      await updateBookingProgress(bookingId, status);
+      if (selectedTask && selectedTask.id === bookingId) {
+        setSelectedTask(prev => ({ ...prev, status }));
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   const handleLogout = async () => {
-    try { await API.post("/staff-auth/logout"); } catch { }
+    try { await logoutUser(); } catch { }
     window.location.reload();
   };
 
@@ -145,11 +128,6 @@ const StaffDashboard = () => {
               {staffInfo.specialization}
             </div>
           )}
-          <button onClick={fetchTasks}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all"
-            style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)" }}>
-            <Icon path={ICONS.refresh} className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} style={{ color: "#60A5FA" }} />
-          </button>
           <button onClick={handleLogout}
             className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all"
             style={{ background: "rgba(239,68,68,0.1)", color: "#FCA5A5", border: "1px solid rgba(239,68,68,0.2)" }}>
@@ -227,7 +205,7 @@ const StaffDashboard = () => {
               const sc = getStatusColor(task.status);
               const nextAction = getNextAction(task.status);
               return (
-                <div key={task._id} className="rounded-2xl overflow-hidden transition-all"
+                <div key={task.id} className="rounded-2xl overflow-hidden transition-all"
                   style={{
                     background: "rgba(255,255,255,0.03)",
                     border: "1px solid rgba(59,130,246,0.1)"
@@ -240,7 +218,7 @@ const StaffDashboard = () => {
                         {task.status}
                       </span>
                       <span className="font-mono text-xs" style={{ color: "#4a5668" }}>
-                        #{task._id?.slice(-8).toUpperCase()}
+                        #{task.id?.slice(-8).toUpperCase()}
                       </span>
                     </div>
 
@@ -248,10 +226,10 @@ const StaffDashboard = () => {
                     <div className="flex items-center gap-3 mb-4">
                       <div className="w-11 h-11 rounded-full flex items-center justify-center text-white font-bold"
                         style={{ background: "linear-gradient(135deg, #1E40AF, #3B82F6)" }}>
-                        {(task.userId?.name || "?")[0].toUpperCase()}
+                        {(task.userId?.name || task.customerName || "?")[0].toUpperCase()}
                       </div>
                       <div className="flex-1">
-                        <div className="text-white font-semibold text-sm">{task.userId?.name || "N/A"}</div>
+                        <div className="text-white font-semibold text-sm">{task.userId?.name || task.customerName || "Customer"}</div>
                         <div className="text-xs" style={{ color: "#6B7280" }}>{task.userId?.email || ""}</div>
                       </div>
                       <button onClick={() => setSelectedTask(task)}
@@ -284,18 +262,6 @@ const StaffDashboard = () => {
                       )}
                     </div>
 
-                    {/* Issue */}
-                    {task.issueCategories?.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-4">
-                        {task.issueCategories.map((c, i) => (
-                          <span key={i} className="text-xs px-2.5 py-1 rounded-full font-medium"
-                            style={{ background: "rgba(59,130,246,0.08)", color: "#60A5FA", border: "1px solid rgba(59,130,246,0.15)" }}>
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-
                     {/* Location + Navigate */}
                     {task.pickupLocation?.lat && (
                       <a
@@ -310,20 +276,14 @@ const StaffDashboard = () => {
                     {/* Action Button */}
                     {nextAction && (
                       <button
-                        disabled={actionLoading === task._id}
-                        onClick={() => {
-                          if (nextAction.action === "accept") acceptTask(task._id);
-                          else updateTaskStatus(task._id, nextAction.nextStatus);
-                        }}
+                        disabled={actionLoading === task.id}
+                        onClick={() => updateTaskStatus(task.id, nextAction.nextStatus)}
                         className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] disabled:opacity-50"
                         style={{ background: nextAction.gradient }}>
-                        {actionLoading === task._id ? (
-                          <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg> Processing...</>
+                        {actionLoading === task.id ? (
+                          <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                         ) : (
-                          <><Icon path={nextAction.action === "accept" ? ICONS.check : ICONS.lightning} className="w-4 h-4" /> {nextAction.label}</>
+                          <><Icon path={ICONS.lightning} className="w-4 h-4" /> {nextAction.label}</>
                         )}
                       </button>
                     )}
@@ -353,7 +313,6 @@ const StaffDashboard = () => {
               background: "rgba(17,24,39,0.97)",
               backdropFilter: "blur(40px)"
             }}>
-            {/* Header */}
             <div className="p-6 pb-4" style={{ background: "linear-gradient(135deg, #1E40AF, #3B82F6)", borderRadius: "24px 24px 0 0" }}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-white font-bold text-lg">Task Details</h3>
@@ -364,10 +323,10 @@ const StaffDashboard = () => {
               </div>
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
-                  {(selectedTask.userId?.name || "?")[0].toUpperCase()}
+                  {(selectedTask.userId?.name || selectedTask.customerName || "?")[0].toUpperCase()}
                 </div>
                 <div>
-                  <div className="text-white font-semibold">{selectedTask.userId?.name || "N/A"}</div>
+                  <div className="text-white font-semibold">{selectedTask.userId?.name || selectedTask.customerName || "N/A"}</div>
                   <div className="text-white/70 text-xs">{selectedTask.userId?.email || ""}</div>
                 </div>
                 <span className="ml-auto text-xs font-semibold px-3 py-1 rounded-full"
@@ -378,18 +337,13 @@ const StaffDashboard = () => {
             </div>
 
             <div className="p-6 space-y-5">
-              {/* Booking ID */}
               <div className="flex items-center gap-3">
                 <span className="font-mono text-xs px-2.5 py-1 rounded-lg"
                   style={{ background: "rgba(255,255,255,0.06)", color: "#94A3B8" }}>
-                  ID: #{selectedTask._id?.slice(-8).toUpperCase()}
-                </span>
-                <span className="text-xs" style={{ color: "#6B7280" }}>
-                  {new Date(selectedTask.createdAt).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
+                  ID: #{selectedTask.id?.slice(-8).toUpperCase()}
                 </span>
               </div>
 
-              {/* Service Details */}
               <div>
                 <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#6B7280" }}>Service Details</div>
                 <div className="rounded-xl p-4 space-y-3" style={{
@@ -414,102 +368,28 @@ const StaffDashboard = () => {
                         <div className="text-sm font-semibold text-white">{selectedTask.serviceDate}</div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(234,179,8,0.12)" }}>
-                        <Icon path={ICONS.clock} className="w-4 h-4" style={{ color: "#FBBF24" }} />
-                      </div>
-                      <div>
-                        <div className="text-xs" style={{ color: "#6B7280" }}>Time</div>
-                        <div className="text-sm font-semibold text-white">{selectedTask.serviceTime}</div>
-                      </div>
-                    </div>
-                    {selectedTask.doorstepDelivery && (
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: "rgba(168,85,247,0.12)" }}>
-                          <Icon path={ICONS.truck} className="w-4 h-4" style={{ color: "#C084FC" }} />
-                        </div>
-                        <div>
-                          <div className="text-xs" style={{ color: "#6B7280" }}>Doorstep</div>
-                          <div className="text-sm font-semibold" style={{ color: "#C084FC" }}>
-                            {selectedTask.distanceKm}km · ₹{selectedTask.doorstepCharge}
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 </div>
               </div>
 
-              {/* Issue Details */}
               <div>
-                <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#6B7280" }}>Issue Details</div>
+                <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#6B7280" }}>Issue</div>
                 <div className="rounded-xl p-4" style={{
                   background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)"
                 }}>
-                  {selectedTask.issueCategories?.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {selectedTask.issueCategories.map((c, i) => (
-                        <span key={i} className="text-xs px-3 py-1 rounded-full font-medium"
-                          style={{ background: "rgba(59,130,246,0.08)", color: "#60A5FA", border: "1px solid rgba(59,130,246,0.15)" }}>
-                          {c}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                  {selectedTask.issue && selectedTask.issue !== "See issue categories" && (
-                    <p className="text-sm leading-relaxed text-slate-300">{selectedTask.issue}</p>
-                  )}
+                  <p className="text-sm text-slate-300 italic">"{selectedTask.issue}"</p>
                 </div>
               </div>
 
-              {/* Customer Location */}
               {selectedTask.pickupLocation?.lat && (
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#6B7280" }}>Customer Location</div>
-                  <div className="rounded-xl p-4" style={{
-                    background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.15)"
-                  }}>
-                    {selectedTask.pickupLocation.address && (
-                      <p className="text-sm text-white mb-3">
-                        <Icon path={ICONS.mapPin} className="w-4 h-4 inline mr-1" style={{ color: "#10B981", verticalAlign: "middle" }} />
-                        {selectedTask.pickupLocation.address}
-                      </p>
-                    )}
-                    <a
-                      href={`https://www.google.com/maps/dir/?api=1&origin=${SHOP_LOCATION.lat},${SHOP_LOCATION.lng}&destination=${selectedTask.pickupLocation.lat},${selectedTask.pickupLocation.lng}`}
-                      target="_blank" rel="noopener noreferrer"
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
-                      style={{ background: "linear-gradient(135deg, #059669, #10B981)" }}>
-                      <Icon path={ICONS.mapPin} className="w-4 h-4" /> Navigate in Google Maps
-                    </a>
-                  </div>
-                </div>
+                <a
+                  href={`https://www.google.com/maps/dir/?api=1&origin=${SHOP_LOCATION.lat},${SHOP_LOCATION.lng}&destination=${selectedTask.pickupLocation.lat},${selectedTask.pickupLocation.lng}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white transition-all"
+                  style={{ background: "linear-gradient(135deg, #059669, #10B981)" }}>
+                  <Icon path={ICONS.mapPin} className="w-4 h-4" /> Open Navigation
+                </a>
               )}
-
-              {/* Action Button */}
-              {(() => {
-                const action = getNextAction(selectedTask.status);
-                if (!action) return null;
-                return (
-                  <button
-                    disabled={actionLoading === selectedTask._id}
-                    onClick={() => {
-                      if (action.action === "accept") acceptTask(selectedTask._id);
-                      else updateTaskStatus(selectedTask._id, action.nextStatus);
-                    }}
-                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] disabled:opacity-50"
-                    style={{ background: action.gradient }}>
-                    {actionLoading === selectedTask._id ? (
-                      <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg> Processing...</>
-                    ) : (
-                      <><Icon path={action.action === "accept" ? ICONS.check : ICONS.lightning} className="w-4 h-4" /> {action.label}</>
-                    )}
-                  </button>
-                );
-              })()}
             </div>
           </div>
         </div>

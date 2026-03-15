@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import API from "../services/api";
+import { registerUser, loginUser, resetPassword } from "../services/firebaseService";
 
 function Login({ setUser, onSwitchToAdmin, onBack }) {
   const [isLogin, setIsLogin] = useState(true);
@@ -8,6 +8,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
   const [msgType, setMsgType] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [resetSent, setResetSent] = useState(false);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -18,12 +19,23 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
     e.preventDefault();
     setLoading(true); setMsg("");
     try {
-      const res = await API.post("/auth/login", { email: formData.email, password: formData.password });
+      const user = await loginUser({ email: formData.email, password: formData.password });
+      if (user.role === "admin" || user.role === "staff") {
+        setMsgType("error");
+        setMsg("Please use the Admin or Staff portal to login.");
+        setLoading(false);
+        return;
+      }
       setMsgType("success"); setMsg("Login successful! Redirecting...");
-      setTimeout(() => setUser(res.data.user), 800);
+      setTimeout(() => setUser({ ...user, role: "user" }), 800);
     } catch (err) {
       setMsgType("error");
-      setMsg(err.response?.data?.message || "Login failed. Please try again.");
+      const code = err.code || "";
+      if (code.includes("user-not-found") || code.includes("wrong-password") || code.includes("invalid-credential")) {
+        setMsg("Invalid email or password.");
+      } else {
+        setMsg(err.message || "Login failed. Please try again.");
+      }
     } finally { setLoading(false); }
   };
 
@@ -37,18 +49,37 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
       setMsgType("error"); setMsg("Password must be at least 6 characters"); setLoading(false); return;
     }
     try {
-      await API.post("/auth/register", formData);
+      await registerUser(formData);
       setMsgType("success"); setMsg("Registration successful! Please login.");
       setTimeout(() => { setFormData({ name: "", email: "", password: "" }); setIsLogin(true); setMsg(""); setMsgType(""); }, 1500);
     } catch (err) {
       setMsgType("error");
-      setMsg(err.response?.data?.message || "Registration failed. Please try again.");
+      const code = err.code || "";
+      if (code.includes("email-already-in-use")) {
+        setMsg("An account with this email already exists.");
+      } else {
+        setMsg(err.message || "Registration failed. Please try again.");
+      }
     } finally { setLoading(false); }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!formData.email) {
+      setMsgType("error"); setMsg("Enter your email above first."); return;
+    }
+    try {
+      await resetPassword(formData.email);
+      setMsgType("success"); setMsg("Password reset email sent! Check your inbox.");
+      setResetSent(true);
+    } catch {
+      setMsgType("error"); setMsg("Failed to send reset email. Check the email address.");
+    }
   };
 
   const switchMode = (loginMode) => {
     setIsLogin(loginMode); setMsg(""); setMsgType("");
     setFormData({ name: "", email: "", password: "" });
+    setResetSent(false);
   };
 
   return (
@@ -84,6 +115,15 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
               <div className="text-white font-bold text-xl tracking-tight">RMK Garage</div>
               <div className="text-xs" style={{ color: "#4ADE80" }}>Vehicle Service Portal</div>
             </div>
+          </div>
+        </div>
+
+        {/* Firebase badge */}
+        <div className="flex justify-center mb-4">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium"
+            style={{ background: "rgba(34,197,94,0.1)", border: "1px solid rgba(34,197,94,0.2)", color: "#4ADE80" }}>
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse inline-block" />
+            Secured by Firebase
           </div>
         </div>
 
@@ -207,10 +247,9 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
             {isLogin && (
               <div className="flex justify-end">
                 <button type="button" className="text-xs transition-colors"
-                  style={{ color: "#4ADE80" }}
-                  onMouseEnter={e => e.target.style.color = "#0EA5E9"}
-                  onMouseLeave={e => e.target.style.color = "#4ADE80"}>
-                  Forgot password?
+                  style={{ color: resetSent ? "#22C55E" : "#4ADE80" }}
+                  onClick={handleForgotPassword}>
+                  {resetSent ? "✓ Reset email sent" : "Forgot password?"}
                 </button>
               </div>
             )}
@@ -268,7 +307,7 @@ function Login({ setUser, onSwitchToAdmin, onBack }) {
             <div className="flex items-center justify-center gap-6 text-xs" style={{ color: "#475569" }}>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse inline-block" />
-                <span>Secure Auth</span>
+                <span>Firebase Auth</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full inline-block" style={{ background: "#22C55E" }} />

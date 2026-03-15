@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import API from "../services/api";
+import { loginAdmin } from "../services/firebaseService";
 
 /* ── Particle animation canvas ─────────────────────────────── */
 const ParticleCanvas = () => {
@@ -117,20 +117,10 @@ function AdminLogin({ setUser, onSwitchToUser }) {
         setMsg("");
 
         try {
-            const res = await API.post("/auth/login", {
+            const loggedUser = await loginAdmin({
                 email: formData.email,
                 password: formData.password,
             });
-
-            const loggedUser = res.data.user;
-
-            // ✅ Check admin role
-            if (loggedUser.role !== "admin") {
-                setMsgType("error");
-                setMsg("Access denied. This portal is for administrators only.");
-                setLoading(false);
-                return;
-            }
 
             setMsgType("success");
             setMsg("Authentication successful. Redirecting to admin panel...");
@@ -141,7 +131,7 @@ function AdminLogin({ setUser, onSwitchToUser }) {
 
         } catch (err) {
             setMsgType("error");
-            setMsg(err.response?.data?.message || "Authentication failed. Please try again.");
+            setMsg(err.message || "Authentication failed. Please try again.");
         } finally {
             setLoading(false);
         }

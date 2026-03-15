@@ -183,7 +183,7 @@ const DashboardTab = (props) => {
                   {bookings.slice(0, 6).map(b => {
                     const statusColor = b.status === "Pending" ? "#FBBF24" : b.status === "Accepted" ? "#22C55E" : "#F87171";
                     return (
-                      <div key={b._id} className="flex items-center gap-3 p-2.5 rounded-xl transition-all"
+                      <div key={b.id} className="flex items-center gap-3 p-2.5 rounded-xl transition-all"
                         style={{ border: '1px solid transparent' }}
                         onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(37,99,235,0.04)'; e.currentTarget.style.borderColor = 'rgba(37,99,235,0.1)'; }}
                         onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; }}>

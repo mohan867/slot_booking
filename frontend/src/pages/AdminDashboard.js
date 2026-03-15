@@ -1,5 +1,14 @@
-import React, { useEffect, useState, useRef } from "react";
-import API from "../services/api";
+import React, { useEffect, useState, useRef, useMemo } from "react";
+import { 
+  logoutUser, 
+  getCurrentUserProfile, 
+  listenAllBookings, 
+  listenAllUsers, 
+  listenAllStaff,
+  updateBookingStatus,
+  assignStaffToBooking,
+  deleteBooking
+} from "../services/firebaseService";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import AdminDashboardTab from '../components/AdminDashboard/AdminDashboardTab';
@@ -76,22 +85,22 @@ const getStatusBadge = (status, dark) => {
   return map[status] || "badge-pending-light";
 };
 
-/* ── Admin Sidebar ─────────────────────────────────────────── */
-const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen, setSidebarOpen }) => {
+
+/* ── Sidebar ──────────────────────────────────────────────── */
+const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen, setSidebarOpen }) => {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: ICONS.dashboard },
-    { id: "bookings", label: "All Bookings", icon: ICONS.bookings },
-    { id: "users", label: "Users", icon: ICONS.users },
-    { id: "staff", label: "Staff", icon: ICONS.wrench },
+    { id: "bookings", label: "Manage Bookings", icon: ICONS.bookings },
+    { id: "users", label: "System Users", icon: ICONS.users },
+    { id: "staff", label: "Staff Directory", icon: ICONS.shield },
   ];
 
   const sidebarBg = dark ? "sidebar-dark" : "sidebar-light";
   const logoText = dark ? "text-white" : "text-slate-900";
   const logoSub = dark ? "text-slate-500" : "text-slate-400";
-  const logoutStyle = dark
-    ? "text-slate-500 hover:text-red-400 hover:bg-red-500/10"
+  const logoutStyle = dark 
+    ? "text-slate-500 hover:text-red-400 hover:bg-red-500/10" 
     : "text-slate-400 hover:text-red-500 hover:bg-red-50";
-
 
   return (
     <>
@@ -99,23 +108,22 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
         <div className="lg:hidden fixed inset-0 bg-black/60 z-20 animate-fadeIn"
           onClick={() => setSidebarOpen(false)} />
       )}
+
       <aside className={`
         fixed top-0 left-0 h-full w-64 z-30 flex flex-col
         sidebar-transition
         ${sidebarBg}
         ${sidebarOpen ? "sidebar-mobile-visible" : "sidebar-mobile-hidden"}
-      `}
-      style={{ transform: typeof window !== 'undefined' && window.innerWidth >= 1024 ? 'translateX(0)' : undefined }}>
-        {/* Logo */}
-        <div className="flex items-center gap-3 px-6 py-6"
-          style={{ borderBottom: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)" }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: "linear-gradient(135deg, #166534, #22C55E)" }}>
-            <Icon path={ICONS.shield} className="w-5 h-5 text-white" />
+        lg:translate-x-0
+      `}>
+        <div className="flex items-center gap-3 px-6 py-6" style={{ borderBottom: dark ? "1px solid rgba(37,99,235,0.08)" : "1px solid rgba(0,0,0,0.06)" }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" 
+            style={{ background: "linear-gradient(135deg, #2563EB, #3B82F6)", boxShadow: "0 4px 16px rgba(37,99,235,0.35)" }}>
+            <Icon path={ICONS.lightning} className="w-5 h-5 text-white" />
           </div>
           <div>
-            <div className={`font-bold text-base tracking-tight ${logoText}`}>Admin Portal</div>
-            <div className={`text-xs ${logoSub}`}>RMK Garage</div>
+            <div className={`font-bold text-base tracking-tight ${logoText}`}>Garage Admin</div>
+            <div className={`text-xs ${logoSub}`}>Control Center</div>
           </div>
           <button className={`ml-auto lg:hidden transition-colors ${dark ? "text-slate-500 hover:text-slate-300" : "text-slate-400 hover:text-slate-600"}`}
             onClick={() => setSidebarOpen(false)}>
@@ -123,20 +131,9 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
           </button>
         </div>
 
-        {/* Badge */}
-        <div className="px-6 py-3">
-          <div className="px-3 py-1.5 rounded-lg text-xs font-semibold inline-flex items-center gap-1.5"
-            style={{ background: "rgba(34,197,94,0.1)", color: "#4ADE80", border: "1px solid rgba(34,197,94,0.2)" }}>
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#4ADE80' }} />
-            Administrator
-          </div>
-        </div>
-
-        {/* Nav */}
-        <nav className="flex-1 px-3 py-2 space-y-1 overflow-y-auto">
-          <div className={`text-xs font-700 uppercase tracking-widest mb-3 px-3 ${dark ? "text-slate-600" : "text-slate-400"}`}
-            style={{ fontWeight: 700 }}>
-            Management
+        <nav className="flex-1 px-3 py-4 space-y-1">
+          <div className={`text-xs font-bold uppercase tracking-widest mb-3 px-3 ${dark ? "text-slate-600" : "text-slate-400"}`}>
+            Navigation
           </div>
           {navItems.map(item => (
             <button
@@ -150,26 +147,18 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
               <Icon path={item.icon} className="w-5 h-5 flex-shrink-0" />
               {item.label}
               {activeTab === item.id && (
-                <span className="ml-auto w-2 h-2 rounded-full" style={{ background: "linear-gradient(135deg, #166534, #22C55E)" }} />
+                <span className="ml-auto w-2 h-2 rounded-full" style={{ background: "#3B82F6", boxShadow: "0 0 8px rgba(59,130,246,0.5)" }} />
               )}
             </button>
           ))}
         </nav>
 
-        {/* Admin info + Logout */}
-        <div className="px-3 pb-6 space-y-2"
-          style={{ borderTop: dark ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
-          <div className="flex items-center gap-3 px-3 py-3" style={{ borderRadius: 12 }}>
-            <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0"
-              style={{ background: "linear-gradient(135deg, #166534, #22C55E)" }}>A</div>
-            <div>
-              <div className={`text-sm font-semibold ${dark ? "text-slate-200" : "text-slate-700"}`}>Admin User</div>
-              <div className={`text-xs ${dark ? "text-slate-500" : "text-slate-400"}`}>admin@rmk.com</div>
-            </div>
-          </div>
-          <button onClick={handleLogout}
-            className={`w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-xl transition-all ${logoutStyle}`}>
-            <Icon path={ICONS.logout} className="w-5 h-5" />
+        <div className="px-3 pb-6">
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center gap-3 px-3 py-3 text-sm font-medium rounded-xl transition-all duration-200 ${logoutStyle}`}
+          >
+            <Icon path={ICONS.logout} className="w-5 h-5 flex-shrink-0" />
             Sign Out
           </button>
         </div>
@@ -178,193 +167,153 @@ const AdminSidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen
   );
 };
 
-/* ══════════════════════════════════════════════════════════ */
-/*                     ADMIN DASHBOARD                       */
-/* ══════════════════════════════════════════════════════════ */
+
+/* ── Main Component ────────────────────────────────────────── */
 const AdminDashboard = () => {
   const [bookings, setBookings] = useState([]);
+  const [users, setUsers] = useState([]);
+  const [staff, setStaff] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [filterStatus, setFilterStatus] = useState("All");
-  const getInitialTab = () => {
-    const hash = window.location.hash.replace('#', '');
-    return ['dashboard', 'bookings', 'users', 'staff'].includes(hash) ? hash : 'dashboard';
-  };
-  const [activeTab, setActiveTabState] = useState(getInitialTab);
+  const [message, setMessage] = useState({ text: "", type: "" });
+  const [activeTab, setActiveTab] = useState("dashboard");
+  const [userData, setUserData] = useState(null);
   const [dark, setDark] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const setActiveTab = (tab) => {
-    setActiveTabState(tab);
-    window.location.hash = tab;
-  };
-
-  /* ── Sync tab with browser back/forward ── */
-  useEffect(() => {
-    const onHashChange = () => {
-      const hash = window.location.hash.replace('#', '');
-      if (['dashboard', 'bookings', 'users', 'staff'].includes(hash)) {
-        setActiveTabState(hash);
-      }
-    };
-    window.addEventListener('hashchange', onHashChange);
-    return () => window.removeEventListener('hashchange', onHashChange);
-  }, []);
-  const [actionLoading, setActionLoading] = useState(null);
+  /* ── Booking Tracking & Filtering ── */
+  const [filterStatus, setFilterStatus] = useState("All");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
-  const [availableStaff, setAvailableStaff] = useState([]);
-  const [allStaff, setAllStaff] = useState([]);
-  const [staffLoadError, setStaffLoadError] = useState("");
-  const [staffLoading, setStaffLoading] = useState(false);
-  const [assignStaffId, setAssignStaffId] = useState("");
 
-  /* ── Admin map refs for booking detail ── */
-  const adminMapContainerRef = useRef(null);
-  const adminMapInstanceRef = useRef(null);
+  /* ── Map Modal State ── */
+  const [mapModal, setMapModal] = useState({ isOpen: false, location: null, vehicle: "", address: "" });
+  const mapContainerRef = useRef(null);
+  const mapInstanceRef = useRef(null);
+  const markerRef = useRef(null);
+  const routeLineRef = useRef(null);
+  const shopMarkerRef = useRef(null);
 
-  /* ── Auto-load staff when booking modal opens for assignment ── */
   useEffect(() => {
-    if (selectedBooking && !selectedBooking.staffId &&
-        (selectedBooking.status === 'Pending' || selectedBooking.status === 'Accepted')) {
-      fetchAvailableStaff();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedBooking?._id]);
-
-  /* ── Initialize map when booking detail modal opens with location ── */
-  useEffect(() => {
-    // Cleanup previous map
-    if (adminMapInstanceRef.current) {
-      adminMapInstanceRef.current.remove();
-      adminMapInstanceRef.current = null;
-    }
-
-    if (!selectedBooking?.pickupLocation?.lat || !adminMapContainerRef.current) return;
-
-    const timer = setTimeout(() => {
-      if (!adminMapContainerRef.current || adminMapInstanceRef.current) return;
-
-      const userLat = selectedBooking.pickupLocation.lat;
-      const userLng = selectedBooking.pickupLocation.lng;
-
-      const map = L.map(adminMapContainerRef.current, {
-        center: [userLat, userLng],
-        zoom: 13,
-        zoomControl: false,
-        scrollWheelZoom: true
-      });
-      L.control.zoom({ position: 'bottomright' }).addTo(map);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '\u00a9 OpenStreetMap',
-        maxZoom: 19
-      }).addTo(map);
-
-      // Shop marker
-      const shopIcon = L.divIcon({
-        html: `<div style="background:linear-gradient(135deg,#166534,#22C55E);width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
-        </div>`,
-        className: '', iconSize: [36, 36], iconAnchor: [18, 36]
-      });
-      L.marker([SHOP_LOCATION.lat, SHOP_LOCATION.lng], { icon: shopIcon }).addTo(map)
-        .bindPopup('<b>RMK Garage</b><br/><small>Shop Location</small>');
-
-      // User marker
-      const userIcon = L.divIcon({
-        html: `<div style="background:linear-gradient(135deg,#22C55E,#4ADE80);width:36px;height:36px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>
-        </div>`,
-        className: '', iconSize: [36, 36], iconAnchor: [18, 36]
-      });
-      L.marker([userLat, userLng], { icon: userIcon }).addTo(map)
-        .bindPopup(`<b>Customer Pickup</b><br/><small>${(selectedBooking.pickupLocation.address || '').substring(0, 60)}...</small>`)
-        .openPopup();
-
-      // Route line
-      L.polyline(
-        [[SHOP_LOCATION.lat, SHOP_LOCATION.lng], [userLat, userLng]],
-        { color: '#22C55E', weight: 3, opacity: 0.6, dashArray: '8, 8' }
-      ).addTo(map);
-
-      // Fit bounds
-      const bounds = L.latLngBounds([[SHOP_LOCATION.lat, SHOP_LOCATION.lng], [userLat, userLng]]);
-      map.fitBounds(bounds, { padding: [50, 50] });
-
-      adminMapInstanceRef.current = map;
-    }, 300);
+    fetchProfile();
+    
+    // ✅ Real-time listeners
+    const unsubBookings = listenAllBookings(setBookings);
+    const unsubUsers = listenAllUsers(setUsers);
+    const unsubStaff = listenAllStaff(setStaff);
 
     return () => {
-      clearTimeout(timer);
-      if (adminMapInstanceRef.current) {
-        adminMapInstanceRef.current.remove();
-        adminMapInstanceRef.current = null;
-      }
+      unsubBookings();
+      unsubUsers();
+      unsubStaff();
     };
-  }, [selectedBooking]);
+  }, []);
 
-  useEffect(() => { fetchBookings(); }, []);
-
-  const fetchBookings = async () => {
-    setLoading(true);
-    try { const res = await API.get("/admin/bookings"); setBookings(res.data); }
-    catch (e) { console.error(e); }
-    finally { setLoading(false); }
+  const fetchProfile = async () => {
+    try {
+      const profile = await getCurrentUserProfile();
+      setUserData(profile);
+    } catch { }
   };
 
-  const updateStatus = async (id, type) => {
-    setActionLoading(id + type);
+  const filteredBookings = useMemo(() => {
+    if (filterStatus === "All") return bookings;
+    return bookings.filter(b => b.status === filterStatus);
+  }, [bookings, filterStatus]);
+
+  const handleUpdateStatus = async (id, status) => {
+    setLoading(true);
     try {
-      await API.put(`/admin/booking/${type}/${id}`);
-      const newStatus = type === "accept" ? "Accepted" : "Rejected";
-      setBookings(prev => prev.map(b =>
-        b._id === id ? { ...b, status: newStatus } : b
-      ));
-      // Update detail modal if open
-      if (selectedBooking && selectedBooking._id === id) {
-        setSelectedBooking(prev => prev ? { ...prev, status: newStatus } : null);
+      await updateBookingStatus(id, status);
+      showMessage(`Booking ${status.toLowerCase()}!`, "success");
+      if (selectedBooking?.id === id) {
+        setSelectedBooking(prev => ({ ...prev, status }));
       }
-    } catch (e) { console.error(e); }
-    finally { setActionLoading(null); }
+    } catch (err) {
+      showMessage(err.message || "Update failed", "error");
+    } finally { setLoading(false); }
+  };
+
+  const handleAssignStaff = async (bookingId, staffId) => {
+    setLoading(true);
+    try {
+      await assignStaffToBooking(bookingId, staffId);
+      showMessage("Staff assigned successfully!", "success");
+    } catch (err) {
+      showMessage(err.message || "Assignment failed", "error");
+    } finally { setLoading(false); }
+  };
+
+  const handleDeleteBooking = async (id) => {
+    if (!window.confirm("Permanently delete this booking?")) return;
+    setLoading(true);
+    try {
+      await deleteBooking(id);
+      showMessage("Booking deleted successfully", "success");
+      if (selectedBooking?.id === id) setSelectedBooking(null);
+    } catch (err) {
+      showMessage(err.message || "Delete failed", "error");
+    } finally { setLoading(false); }
   };
 
   const handleLogout = async () => {
-    try { await API.post("/auth/logout"); } catch { }
+    try { await logoutUser(); } catch { }
     window.location.reload();
   };
 
-  const fetchAvailableStaff = async () => {
-    setStaffLoading(true);
-    setStaffLoadError("");
-    try {
-      const [availRes, allRes] = await Promise.all([
-        API.get("/admin/available-staff"),
-        API.get("/staff/all")
-      ]);
-      setAvailableStaff(availRes.data);
-      setAllStaff(allRes.data);
-    } catch (e) {
-      console.error(e);
-      setStaffLoadError(e.response?.data?.message || "Failed to load staff. Check if backend is running.");
-    } finally {
-      setStaffLoading(false);
-    }
+  const showMessage = (text, type) => {
+    setMessage({ text, type });
+    setTimeout(() => setMessage({ text: "", type: "" }), 5000);
   };
 
-  const assignStaffToBooking = async (bookingId, staffObjId) => {
-    if (!staffObjId) return;
-    setActionLoading(bookingId + "assign");
-    try {
-      const res = await API.put(`/admin/assign-staff/${bookingId}`, { staffId: staffObjId });
-      setBookings(prev => prev.map(b =>
-        b._id === bookingId ? res.data.booking : b
-      ));
-      if (selectedBooking && selectedBooking._id === bookingId) {
-        setSelectedBooking(res.data.booking);
-      }
-      setAssignStaffId("");
-    } catch (e) { console.error(e); }
-    finally { setActionLoading(null); }
+  /* ── Map Logic ────────────────────────────────────────── */
+  useEffect(() => {
+    if (mapModal.isOpen && mapContainerRef.current && !mapInstanceRef.current && mapModal.location) {
+      const timer = setTimeout(() => {
+        const { lat, lng } = mapModal.location;
+        const map = L.map(mapContainerRef.current, { center: [lat, lng], zoom: 13, zoomControl: false });
+        L.control.zoom({ position: 'bottomright' }).addTo(map);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { attribution: '© OpenStreetMap' }).addTo(map);
+
+        const shopIcon = L.divIcon({
+          html: `<div style="background:linear-gradient(135deg,#059669,#10B981);width:36px;height:36px;border-radius:50%;border:4px solid #fff;box-shadow:0 4px 15px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          </div>`,
+          className: '', iconSize: [36, 36], iconAnchor: [18, 36]
+        });
+        shopMarkerRef.current = L.marker([SHOP_LOCATION.lat, SHOP_LOCATION.lng], { icon: shopIcon }).addTo(map).bindPopup(SHOP_LOCATION.name);
+
+        const userIcon = L.divIcon({
+          html: `<div style="background:linear-gradient(135deg,#F43F5E,#FB7185);width:32px;height:32px;border-radius:50%;border:3px solid #fff;box-shadow:0 4px 15px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><circle cx="12" cy="11" r="3"/></svg>
+          </div>`,
+          className: '', iconSize: [32, 32], iconAnchor: [16, 32]
+        });
+        markerRef.current = L.marker([lat, lng], { icon: userIcon }).addTo(map).bindPopup(`<b>Pickup: ${mapModal.vehicle}</b><br/>${mapModal.address?.substring(0,60)}...`);
+
+        routeLineRef.current = L.polyline([[SHOP_LOCATION.lat, SHOP_LOCATION.lng], [lat, lng]], { color: '#3B82F6', weight: 3, opacity: 0.6, dashArray: '10, 10' }).addTo(map);
+        map.fitBounds(L.latLngBounds([[SHOP_LOCATION.lat, SHOP_LOCATION.lng], [lat, lng]]), { padding: [50, 50] });
+
+        mapInstanceRef.current = map;
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [mapModal.isOpen, mapModal.location]);
+
+  const closeMap = () => {
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.remove();
+      mapInstanceRef.current = null;
+    }
+    setMapModal({ isOpen: false, location: null, vehicle: "", address: "" });
   };
+
+  /* ── UI Config ───────────────────────────────────────────── */
+  const appBg = dark ? "bg-app-dark" : "bg-app-light";
+  const textPrimary = dark ? "text-slate-100" : "text-slate-900";
+  const textSecondary = dark ? "text-slate-400" : "text-slate-500";
+  const cardClass = dark ? "card-dark" : "card-light";
+  const inputClass = dark ? "input-dark" : "input-light";
+  const badgeFn = (s) => getStatusBadge(s, dark);
 
   const stats = {
     total: bookings.length,
@@ -374,705 +323,208 @@ const AdminDashboard = () => {
     assigned: bookings.filter(b => b.status === "Assigned").length,
     inProgress: bookings.filter(b => b.status === "In Progress").length,
     completed: bookings.filter(b => b.status === "Completed").length,
+    totalUsers: users.length,
+    totalStaff: staff.length,
+    activeStaff: staff.filter(s => s.status === "Available").length,
   };
 
-  const filteredBookings = bookings.filter(b =>
-    filterStatus === "All" ? true : b.status === filterStatus
-  );
-
-  // Unique users
-  const uniqueUsers = [...new Map(bookings.map(b => [b.userId?._id, b.userId]).filter(([k]) => k)).values()];
-
-  /* Theme helpers */
-  const textPrimary = dark ? "text-slate-100" : "text-slate-900";
-  const textSecondary = dark ? "text-slate-400" : "text-slate-500";
-  const cardClass = dark ? "card-dark" : "card-light";
-  const badgeFn = (s) => getStatusBadge(s, dark);
-
-  /* Filter chip styles */
-  const filterChip = (status) => {
-    const isActive = filterStatus === status;
-    if (!isActive) return dark
-      ? "border border-white/8 text-slate-400 hover:border-green-500/30 hover:text-green-300"
-      : "border border-slate-200 text-slate-500 hover:border-green-300 hover:text-green-600";
-
-    return `text-white border-transparent`;
-  };
-
-  const adminCommonProps = {
-    dark, textPrimary, textSecondary, cardClass, badgeFn, filterChip,
-    stats, bookings, filteredBookings, uniqueUsers,
-    loading, fetchBookings, filterStatus, setFilterStatus,
-    setActiveTab, setSelectedBooking, setSelectedUser,
-    ICONS, SHOP_LOCATION,
-    availableStaff, allStaff, staffLoadError, staffLoading, fetchAvailableStaff, assignStaffToBooking,
-    assignStaffId, setAssignStaffId, actionLoading,
+  const commonProps = {
+    dark, textPrimary, textSecondary, ICONS, cardClass, badgeFn, inputClass,
+    stats, bookings, users, staff, loading, setActiveTab,
+    handleUpdateStatus, handleAssignStaff, handleDeleteBooking,
+    setMapModal, ICONS, Icon, activeTab,
+    filterStatus, setFilterStatus, filteredBookings,
+    selectedBooking, setSelectedBooking, selectedUser, setSelectedUser
   };
 
   return (
-    <div className={`${dark ? "bg-app-dark" : "bg-app-light"} min-h-screen flex`}>
-      {/* Sidebar */}
-      <AdminSidebar
-        activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        handleLogout={handleLogout}
-        dark={dark}
-        sidebarOpen={sidebarOpen}
-        setSidebarOpen={setSidebarOpen}
+    <div className={`${appBg} min-h-screen flex`}>
+      <Sidebar 
+        activeTab={activeTab} 
+        setActiveTab={setActiveTab} 
+        handleLogout={handleLogout} 
+        dark={dark} 
+        sidebarOpen={sidebarOpen} 
+        setSidebarOpen={setSidebarOpen} 
       />
 
-      {/* Main */}
       <div className="flex-1 lg:ml-64 flex flex-col min-h-screen">
-        {/* Top bar */}
-        <header className={`sticky top-0 z-10 flex items-center justify-between px-6 py-4 ${dark ? "border-b border-white/5" : "border-b border-black/5"
-          }`} style={{
-            background: dark ? "rgba(10,15,30,0.85)" : "rgba(240,244,255,0.85)",
-            backdropFilter: "blur(20px)"
-          }}>
+        <header className={`sticky top-0 z-10 flex items-center justify-between px-6 py-4 ${dark ? "border-b border-white/5" : "border-b border-black/5"}`}
+          style={{ background: dark ? "rgba(15,23,42,0.92)" : "rgba(240,244,255,0.85)", backdropFilter: "blur(24px)" }}>
           <div className="flex items-center gap-4">
-            <button className={`lg:hidden transition-colors ${dark ? "text-slate-400 hover:text-slate-200" : "text-slate-500 hover:text-slate-700"}`}
+            <button className="lg:hidden text-slate-400 hover:text-white transition-colors"
               onClick={() => setSidebarOpen(!sidebarOpen)}>
               <Icon path={ICONS.menu} className="w-6 h-6" />
             </button>
-            <div>
-              <h1 className={`text-lg font-bold ${textPrimary}`}>
-                {activeTab === "dashboard" && "Admin Dashboard"}
-                {activeTab === "bookings" && "Booking Management"}
-                {activeTab === "users" && "User Management"}
-                {activeTab === "staff" && "Staff Management"}
-              </h1>
-              <p className={`text-xs ${textSecondary}`}>
-                {new Date().toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-              </p>
-            </div>
+            <h1 className={`text-lg font-bold ${textPrimary}`}>Admin Dashboard</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={fetchBookings}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${dark ? "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-slate-200"
-                : "bg-black/5 hover:bg-black/10 text-slate-400 hover:text-slate-700"
-                }`}>
-              <Icon path={ICONS.refresh} className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-            </button>
-            <button onClick={() => setDark(!dark)}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${dark ? "bg-white/5 hover:bg-white/10 text-slate-400 hover:text-yellow-400"
-                : "bg-black/5 hover:bg-black/10 text-slate-400 hover:text-green-600"
-                }`}>
+          <div className="flex items-center gap-4">
+            <button onClick={() => setDark(!dark)} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all bg-white/5 border border-white/10 text-slate-400 hover:text-white">
               <Icon path={dark ? ICONS.sun : ICONS.moon} className="w-4 h-4" />
             </button>
-            {/* Pending alert */}
-            {stats.pending > 0 && (
-              <button onClick={() => { setActiveTab("bookings"); setFilterStatus("Pending"); }}
-                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold"
-                style={{ background: "rgba(234,179,8,0.15)", color: "#EAB308", border: "1px solid rgba(234,179,8,0.3)" }}>
-                <Icon path={ICONS.clock} className="w-3.5 h-3.5" />
-                {stats.pending} Pending
-              </button>
-            )}
+            <div className="flex items-center gap-3 pl-4 border-l border-white/10">
+              <div className="text-right hidden sm:block">
+                <div className={`text-sm font-bold ${textPrimary}`}>{userData?.name || "Admin"}</div>
+                <div className="text-[10px] text-blue-500 font-bold uppercase tracking-wider">Super Control</div>
+              </div>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-black text-sm"
+                style={{ background: "linear-gradient(135deg, #2563EB, #3B82F6)" }}>
+                {(userData?.name || "A")[0].toUpperCase()}
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* Page */}
-        <main className="flex-1 px-4 sm:px-6 py-6">
+        <main className="flex-1 px-6 py-6 overflow-y-auto">
+          {message.text && (
+            <div className={`mb-6 p-4 rounded-2xl flex items-center gap-3 text-sm font-medium animate-fadeIn ${
+              message.type === "error" 
+                ? "bg-red-500/10 border border-red-500/20 text-red-400" 
+                : "bg-green-500/10 border border-green-500/20 text-green-400"
+            }`}>
+              <Icon path={message.type === "error" ? ICONS.x : ICONS.check} className="w-5 h-5 flex-shrink-0" />
+              {message.text}
+            </div>
+          )}
 
-
-          {/* ══════ DASHBOARD ══════ */}
-          {activeTab === "dashboard" && <AdminDashboardTab {...adminCommonProps} />}
-
-          {/* ══════ ALL BOOKINGS ══════ */}
-          {activeTab === "bookings" && <AdminBookingsTab {...adminCommonProps} />}
-
-          {/* ══════ USERS ══════ */}
-          {activeTab === "users" && <AdminUsersTab {...adminCommonProps} />}
-
-          {/* ══════ STAFF ══════ */}
-          {activeTab === "staff" && <AdminStaffTab {...adminCommonProps} />}
+          <AdminDashboardTab {...commonProps} />
+          <AdminBookingsTab {...commonProps} />
+          <AdminUsersTab {...commonProps} />
+          <AdminStaffTab {...commonProps} />
         </main>
       </div>
 
-      {/* ── Booking Detail Modal ── */}
-      {selectedBooking && (
+      {/* ── Map Modal ── */}
+      {mapModal.isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/70 animate-fadeIn"
-            onClick={() => setSelectedBooking(null)} />
-          <div className={`relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fadeInUp`}
-            style={{
-              borderRadius: 24,
-              border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0',
-              background: dark ? 'rgba(17,24,39,0.97)' : '#FFFFFF',
-              backdropFilter: 'blur(40px)'
-            }}>
-            {/* Header Gradient */}
-            <div className="p-6 pb-4" style={{ background: 'linear-gradient(135deg, #166534, #22C55E)', borderRadius: '24px 24px 0 0' }}>
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-white font-bold text-lg">Booking Details</h3>
-                <button onClick={() => setSelectedBooking(null)}
-                  className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition">
-                  <Icon path={ICONS.close} className="w-4 h-4" />
-                </button>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center text-white font-bold text-lg">
-                  {(selectedBooking.userId?.name || '?')[0].toUpperCase()}
-                </div>
-                <div>
-                  <div className="text-white font-semibold text-base">{selectedBooking.userId?.name || 'N/A'}</div>
-                  <div className="text-white/70 text-xs">{selectedBooking.userId?.email || ''}</div>
-                </div>
-                <span className={`ml-auto ${badgeFn(selectedBooking.status)}`}>{selectedBooking.status}</span>
+          <div className="absolute inset-0 bg-black/80 animate-fadeIn" onClick={closeMap} />
+          <div className="relative z-10 w-full max-w-4xl glass-dark rounded-3xl overflow-hidden animate-fadeInUp flex flex-col md:flex-row" style={{ minHeight: 450 }}>
+            <div className="relative flex-1 bg-slate-900">
+              <div ref={mapContainerRef} className="w-full h-[400px] md:h-full" />
+              <div className="absolute top-4 left-4 z-[1000] px-3 py-1.5 bg-black/60 backdrop-blur-md rounded-lg border border-white/10 flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+                <span className="text-[10px] text-white font-bold uppercase tracking-wider">Pickup Route Analysis</span>
               </div>
             </div>
-
-            <div className="p-6 space-y-5">
-              {/* Booking ID + Timestamps */}
-              <div className="flex items-center gap-3 flex-wrap">
-                <span className="font-mono text-xs px-2.5 py-1 rounded-lg"
-                  style={{ background: dark ? 'rgba(255,255,255,0.06)' : '#F1F5F9', color: dark ? '#94A3B8' : '#64748B' }}>
-                  ID: #{selectedBooking._id?.slice(-8).toUpperCase()}
-                </span>
-                <span className={`text-xs ${textSecondary}`}>
-                  Booked: {new Date(selectedBooking.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-
-              {/* Customer Info */}
+            <div className="w-full md:w-80 p-8 flex flex-col justify-between border-l border-white/5">
               <div>
-                <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Customer Information</div>
-                <div className={`rounded-xl p-4 space-y-3`} style={{
-                  background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-                  border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
-                }}>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)' }}>
-                      <Icon path={ICONS.user} className="w-4 h-4" style={{ color: '#4ADE80' }} />
-                    </div>
-                    <div>
-                      <div className={`text-xs ${textSecondary}`}>Name</div>
-                      <div className={`text-sm font-semibold ${textPrimary}`}>{selectedBooking.userId?.name || 'N/A'}</div>
+                <h3 className="text-xl font-bold text-white mb-6">Location Insight</h3>
+                <div className="space-y-6">
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">Vehicle</div>
+                    <div className="flex items-center gap-3 text-white font-semibold">
+                      <Icon path={ICONS.car} className="w-4 h-4 text-blue-500" />
+                      {mapModal.vehicle}
                     </div>
                   </div>
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(59,130,246,0.15)' }}>
-                      <Icon path={ICONS.mail} className="w-4 h-4" style={{ color: '#60A5FA' }} />
-                    </div>
-                    <div>
-                      <div className={`text-xs ${textSecondary}`}>Email</div>
-                      <div className={`text-sm font-medium ${textPrimary}`}>{selectedBooking.userId?.email || 'N/A'}</div>
-                    </div>
-                  </div>
-                  {/* Location Details */}
-                  {selectedBooking.pickupLocation?.lat && (
-                    <>
-                      <div className="flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(16,185,129,0.15)' }}>
-                          <Icon path={ICONS.mapPin} className="w-4 h-4" style={{ color: '#10B981' }} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className={`text-xs ${textSecondary}`}>Location</div>
-                          <div className={`text-sm font-medium ${textPrimary} leading-relaxed`}>
-                            {selectedBooking.pickupLocation.address || `${selectedBooking.pickupLocation.lat.toFixed(4)}, ${selectedBooking.pickupLocation.lng.toFixed(4)}`}
-                          </div>
-                        </div>
-                      </div>
-                      <a
-                        href={`https://www.google.com/maps/dir/?api=1&origin=${SHOP_LOCATION.lat},${SHOP_LOCATION.lng}&destination=${selectedBooking.pickupLocation.lat},${selectedBooking.pickupLocation.lng}`}
-                        target="_blank" rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] hover:shadow-lg"
-                        style={{ background: 'linear-gradient(135deg, #059669, #10B981)' }}>
-                        <Icon path={ICONS.mapPin} className="w-4 h-4" /> Navigate to Customer
-                      </a>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Vehicle & Service Info */}
-              <div>
-                <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Service Details</div>
-                <div className={`rounded-xl p-4`} style={{
-                  background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-                  border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
-                }}>
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Vehicle */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.1)' }}>
-                        <Icon path={ICONS.car} className="w-4 h-4" style={{ color: '#4ADE80' }} />
-                      </div>
-                      <div>
-                        <div className={`text-xs ${textSecondary}`}>Vehicle</div>
-                        <div className="font-mono font-bold text-sm" style={{ color: '#4ADE80' }}>{selectedBooking.vehicleNumber}</div>
-                      </div>
-                    </div>
-                    {/* Status */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{
-                        background: selectedBooking.status === 'Pending' ? 'rgba(234,179,8,0.15)'
-                          : selectedBooking.status === 'Rejected' ? 'rgba(239,68,68,0.15)'
-                          : selectedBooking.status === 'Completed' ? 'rgba(34,197,94,0.15)'
-                          : selectedBooking.status === 'In Progress' ? 'rgba(59,130,246,0.15)'
-                          : 'rgba(34,197,94,0.15)'
-                      }}>
-                        <Icon path={
-                          selectedBooking.status === 'Pending' ? ICONS.clock
-                          : selectedBooking.status === 'Rejected' ? ICONS.x
-                          : selectedBooking.status === 'In Progress' ? ICONS.lightning
-                          : ICONS.check
-                        } className="w-4 h-4"
-                          style={{ color:
-                            selectedBooking.status === 'Pending' ? '#EAB308'
-                            : selectedBooking.status === 'Rejected' ? '#EF4444'
-                            : selectedBooking.status === 'In Progress' ? '#3B82F6'
-                            : '#22C55E'
-                          }} />
-                      </div>
-                      <div>
-                        <div className={`text-xs ${textSecondary}`}>Status</div>
-                        <div className={`text-sm font-semibold ${textPrimary}`}>{selectedBooking.status}</div>
-                      </div>
-                    </div>
-                    {/* Date */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(34,197,94,0.15)' }}>
-                        <Icon path={ICONS.calendar} className="w-4 h-4" style={{ color: '#22C55E' }} />
-                      </div>
-                      <div>
-                        <div className={`text-xs ${textSecondary}`}>Service Date</div>
-                        <div className={`text-sm font-semibold ${textPrimary}`}>{selectedBooking.serviceDate}</div>
-                      </div>
-                    </div>
-                    {/* Time */}
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.15)' }}>
-                        <Icon path={ICONS.clock} className="w-4 h-4" style={{ color: '#EAB308' }} />
-                      </div>
-                      <div>
-                        <div className={`text-xs ${textSecondary}`}>Time Slot</div>
-                        <div className={`text-sm font-semibold ${textPrimary}`}>{selectedBooking.serviceTime}</div>
-                      </div>
+                  <div>
+                    <div className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mb-2">Pickup Address</div>
+                    <div className="text-sm text-slate-400 leading-relaxed font-medium">
+                      {mapModal.address}
                     </div>
                   </div>
                 </div>
               </div>
-
-              {/* Issue Details */}
-              <div>
-                <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Issue Details</div>
-                <div className={`rounded-xl p-4`} style={{
-                  background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-                  border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
-                }}>
-                  {selectedBooking.issueCategories?.length > 0 && (
-                    <div className="mb-3">
-                      <div className={`text-xs mb-2 ${textSecondary}`}>Service Categories</div>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedBooking.issueCategories.map((c, i) => (
-                          <span key={i} className="text-xs px-3 py-1 rounded-full font-medium"
-                            style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.15)' }}>
-                            {c}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  {selectedBooking.issue && selectedBooking.issue !== 'See issue categories' && (
-                    <div>
-                      <div className={`text-xs mb-1.5 ${textSecondary}`}>Description</div>
-                      <p className={`text-sm leading-relaxed ${textPrimary}`}>{selectedBooking.issue}</p>
-                    </div>
-                  )}
-                  {(!selectedBooking.issueCategories?.length && (!selectedBooking.issue || selectedBooking.issue === 'See issue categories')) && (
-                    <p className={`text-sm italic ${textSecondary}`}>No issue details provided</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Doorstep Pickup & Delivery */}
-              {(selectedBooking.doorstepDelivery || selectedBooking.pickupLocation?.lat) && (
-                <div>
-                  <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Doorstep Pickup & Delivery</div>
-                  <div className="rounded-xl overflow-hidden" style={{
-                    background: dark ? 'rgba(37,99,235,0.08)' : 'rgba(37,99,235,0.04)',
-                    border: dark ? '1px solid rgba(37,99,235,0.2)' : '1px solid rgba(37,99,235,0.15)'
-                  }}>
-                    <div className="p-4">
-                      <div className={`flex items-center gap-2 text-sm font-semibold mb-3 ${dark ? 'text-green-400' : 'text-green-600'}`}>
-                        <Icon path={ICONS.truck} className="w-4 h-4" /> Doorstep Service Requested
-                      </div>
-                      <div className="grid grid-cols-2 gap-3 mb-3">
-                        <div className="rounded-lg p-3 text-center" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#F0F4FF' }}>
-                          <div className={`text-xl font-black ${dark ? 'text-green-400' : 'text-green-600'}`}>
-                            {selectedBooking.distanceKm || '—'} <span className="text-xs font-semibold">km</span>
-                          </div>
-                          <div className={`text-xs ${textSecondary}`}>Distance</div>
-                        </div>
-                        <div className="rounded-lg p-3 text-center" style={{ background: dark ? 'rgba(255,255,255,0.04)' : '#F0FDF4' }}>
-                          <div className={`text-xl font-black ${dark ? 'text-emerald-400' : 'text-emerald-600'}`}>
-                            ₹{selectedBooking.doorstepCharge || 100}
-                          </div>
-                          <div className={`text-xs ${textSecondary}`}>Delivery Fee</div>
-                        </div>
-                      </div>
-                      {selectedBooking.pickupLocation?.address && (
-                        <div className="mb-3">
-                          <div className={`text-xs font-semibold mb-1 ${textSecondary}`}>Pickup Address</div>
-                          <p className={`text-xs leading-relaxed ${textPrimary}`}>{selectedBooking.pickupLocation.address}</p>
-                        </div>
-                      )}
-                      {/* Embedded Map */}
-                      {selectedBooking.pickupLocation?.lat && (
-                        <div className="mb-3">
-                          <div className={`text-xs font-semibold mb-2 ${textSecondary}`}>Location Map</div>
-                          <div
-                            ref={adminMapContainerRef}
-                            style={{ width: '100%', height: 250, borderRadius: 12, overflow: 'hidden', border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(0,0,0,0.1)' }}
-                          />
-                        </div>
-                      )}
-                      {selectedBooking.pickupLocation?.lat && (
-                        <a
-                          href={`https://www.google.com/maps/dir/?api=1&origin=${SHOP_LOCATION.lat},${SHOP_LOCATION.lng}&destination=${selectedBooking.pickupLocation.lat},${selectedBooking.pickupLocation.lng}`}
-                          target="_blank" rel="noopener noreferrer"
-                          className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
-                          style={{ background: 'linear-gradient(135deg, #059669, #10B981)' }}>
-                          <Icon path={ICONS.mapPin} className="w-4 h-4" /> Open Navigation in Google Maps
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-
-
-              {/* Assigned Staff Info */}
-              {selectedBooking.staffId && (
-                <div>
-                  <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Assigned Staff</div>
-                  <div className={`rounded-xl p-4`} style={{
-                    background: dark ? 'rgba(59,130,246,0.08)' : 'rgba(59,130,246,0.04)',
-                    border: dark ? '1px solid rgba(59,130,246,0.2)' : '1px solid rgba(59,130,246,0.15)'
-                  }}>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-white font-bold"
-                        style={{ background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}>
-                        {(selectedBooking.staffId.name || '?')[0].toUpperCase()}
-                      </div>
-                      <div className="flex-1">
-                        <div className={`text-sm font-semibold ${textPrimary}`}>{selectedBooking.staffId.name}</div>
-                        <div className={`text-xs ${textSecondary}`}>{selectedBooking.staffId.specialization} · {selectedBooking.staffId.phone}</div>
-                        <div className={`text-xs ${textSecondary}`}>{selectedBooking.staffId.email}</div>
-                      </div>
-                      <span className="text-xs font-mono px-2 py-1 rounded-lg"
-                        style={{ background: dark ? 'rgba(255,255,255,0.06)' : '#F1F5F9', color: dark ? '#94A3B8' : '#64748B' }}>
-                        {selectedBooking.staffId.staffId}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Assign Staff (for Accepted bookings without staff) */}
-              {(selectedBooking.status === 'Accepted' || selectedBooking.status === 'Pending') && !selectedBooking.staffId && (
-                <div>
-                  <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Assign Staff</div>
-                  <div className={`rounded-xl p-4`} style={{
-                    background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-                    border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
-                  }}>
-                    {staffLoadError && (
-                      <div className="mb-3 p-3 rounded-xl text-sm" style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#FCA5A5' }}>
-                        {staffLoadError}
-                      </div>
-                    )}
-                    {staffLoading ? (
-                      <div className="text-center py-4">
-                        <div className="animate-spin w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
-                        <p className={`text-sm ${textSecondary}`}>Loading staff...</p>
-                      </div>
-                    ) : allStaff.length === 0 ? (
-                      <div className="text-center py-3">
-                        <p className={`text-sm mb-2 ${textSecondary}`}>No staff members found. Add staff in Staff Management tab first.</p>
-                        <button onClick={fetchAvailableStaff}
-                          className="px-4 py-2 rounded-xl text-sm font-semibold text-white"
-                          style={{ background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}>
-                          Retry Loading Staff
-                        </button>
-                      </div>
-                    ) : availableStaff.length === 0 ? (
-                      <div className="text-center py-3">
-                        <p className={`text-sm mb-2`} style={{ color: '#FBBF24' }}>All staff members are currently busy or on leave.</p>
-                        <div className="space-y-2 mt-3">
-                          {allStaff.map(s => (
-                            <div key={s._id} className="flex items-center justify-between px-3 py-2 rounded-lg text-xs" style={{ background: 'rgba(255,255,255,0.03)' }}>
-                              <span style={{ color: '#8a9aaa' }}>{s.name} — {s.specialization}</span>
-                              <span className="px-2 py-0.5 rounded-full font-semibold" style={{
-                                background: s.availabilityStatus === 'Busy' ? 'rgba(234,179,8,0.15)' : 'rgba(239,68,68,0.15)',
-                                color: s.availabilityStatus === 'Busy' ? '#FBBF24' : '#FCA5A5'
-                              }}>{s.availabilityStatus}</span>
-                            </div>
-                          ))}
-                        </div>
-                        <button onClick={fetchAvailableStaff}
-                          className="mt-3 px-4 py-2 rounded-xl text-sm font-semibold"
-                          style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}>
-                          Refresh
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        <select
-                          value={assignStaffId}
-                          onChange={(e) => setAssignStaffId(e.target.value)}
-                          className={`w-full px-3 py-2.5 rounded-xl text-sm ${dark ? 'bg-white/5 text-slate-200 border-white/10' : 'bg-white text-slate-700 border-slate-200'} border`}
-                        >
-                          <option value="">Select a staff member...</option>
-                          {allStaff.map(s => (
-                            <option key={s._id} value={s._id}
-                              disabled={s.availabilityStatus !== 'Available'}
-                              style={{ color: s.availabilityStatus !== 'Available' ? '#666' : undefined }}>
-                              {s.name} — {s.specialization} ({s.staffId}) {s.availabilityStatus !== 'Available' ? `[${s.availabilityStatus}]` : '✓ Available'}
-                            </option>
-                          ))}
-                        </select>
-                        <div className="flex gap-2">
-                          <button
-                            disabled={!assignStaffId || !!actionLoading}
-                            onClick={() => assignStaffToBooking(selectedBooking._id, assignStaffId)}
-                            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02] disabled:opacity-50"
-                            style={{ background: 'linear-gradient(135deg, #2563EB, #3B82F6)' }}>
-                            {actionLoading === selectedBooking._id + 'assign' ? (
-                              <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                              </svg> Assigning...</>
-                            ) : (
-                              <><Icon path={ICONS.users} className="w-4 h-4" /> Assign Staff</>
-                            )}
-                          </button>
-                          <button onClick={fetchAvailableStaff}
-                            className="px-3 py-2.5 rounded-xl transition-all"
-                            style={{ background: 'rgba(59,130,246,0.1)', color: '#60A5FA', border: '1px solid rgba(59,130,246,0.2)' }}
-                            title="Refresh staff list">
-                            <Icon path={ICONS.refresh} className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Actions */}
-              {selectedBooking.status === 'Pending' && (
-                <div className="flex gap-3 pt-2">
-                  <button
-                    disabled={!!actionLoading}
-                    onClick={() => updateStatus(selectedBooking._id, 'accept')}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
-                    style={{ background: 'linear-gradient(135deg,#065F46,#059669)', opacity: actionLoading ? 0.6 : 1 }}>
-                    {actionLoading === selectedBooking._id + 'accept' ? (
-                      <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg> Accepting...</>
-                    ) : (
-                      <><Icon path={ICONS.check} className="w-4 h-4" /> Accept Booking</>
-                    )}
-                  </button>
-                  <button
-                    disabled={!!actionLoading}
-                    onClick={() => updateStatus(selectedBooking._id, 'reject')}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-[1.02]"
-                    style={{ background: 'linear-gradient(135deg,#7F1D1D,#DC2626)', opacity: actionLoading ? 0.6 : 1 }}>
-                    {actionLoading === selectedBooking._id + 'reject' ? (
-                      <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg> Rejecting...</>
-                    ) : (
-                      <><Icon path={ICONS.x} className="w-4 h-4" /> Reject Booking</>
-                    )}
-                  </button>
-                </div>
-              )}
+              <button 
+                onClick={closeMap} 
+                className="mt-8 py-3 w-full bg-slate-800 hover:bg-slate-700 text-white rounded-xl text-sm font-bold transition-all border border-white/10"
+              >
+                Close View
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* ── User Detail Modal ── */}
-      {selectedUser && (() => {
-        const uBookings = bookings.filter(b => b.userId?._id === selectedUser._id);
-        const uLocations = uBookings.filter(b => b.pickupLocation?.lat);
-        const uAccepted = uBookings.filter(b => b.status === 'Accepted').length;
-        const uPending = uBookings.filter(b => b.status === 'Pending').length;
-        const uRejected = uBookings.filter(b => b.status === 'Rejected').length;
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/70 animate-fadeIn"
-              onClick={() => setSelectedUser(null)} />
-            <div className={`relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fadeInUp`}
-              style={{
-                borderRadius: 24,
-                border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid #E2E8F0',
-                background: dark ? 'rgba(17,24,39,0.97)' : '#FFFFFF',
-                backdropFilter: 'blur(40px)'
-              }}>
+      {/* ── Booking Details Modal ── */}
+      {selectedBooking && activeTab === "bookings" && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/80 animate-fadeIn" onClick={() => setSelectedBooking(null)} />
+          <div className={`relative z-10 w-full max-w-2xl rounded-3xl overflow-hidden animate-fadeInUp ${dark ? "glass-dark" : "bg-white shadow-2xl"}`}>
+             <div className="p-8">
+               <div className="flex justify-between items-start mb-6">
+                 <div>
+                   <h3 className="text-2xl font-bold text-white mb-1">Booking Details</h3>
+                   <p className="text-sm text-slate-500">ID: {selectedBooking.id}</p>
+                 </div>
+                 <button onClick={() => setSelectedBooking(null)} className="text-slate-500 hover:text-white transition-colors">
+                   <Icon path={ICONS.close} className="w-6 h-6" />
+                 </button>
+               </div>
 
-              {/* Header Gradient */}
-              <div className="p-6 pb-5" style={{ background: 'linear-gradient(135deg, #166534, #22C55E)', borderRadius: '24px 24px 0 0' }}>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-white font-bold text-lg">Customer Profile</h3>
-                  <button onClick={() => setSelectedUser(null)}
-                    className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center text-white hover:bg-white/30 transition">
-                    <Icon path={ICONS.close} className="w-4 h-4" />
-                  </button>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center text-white font-black text-xl">
-                    {(selectedUser.name || '?')[0].toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-white font-bold text-lg">{selectedUser.name || 'N/A'}</div>
-                    <div className="text-white/70 text-sm flex items-center gap-2">
-                      <Icon path={ICONS.mail} className="w-3.5 h-3.5" /> {selectedUser.email || ''}
+               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                 <div className="space-y-4">
+                   <div>
+                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Vehicle</label>
+                     <div className="text-lg font-bold text-white">{selectedBooking.vehicleNumber}</div>
+                   </div>
+                   <div>
+                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Service Schedule</label>
+                     <div className="text-white">{selectedBooking.serviceDate} at {selectedBooking.serviceTime}</div>
+                   </div>
+                   <div>
+                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Issue</label>
+                     <div className="text-white bg-white/5 p-3 rounded-xl border border-white/5 italic">"{selectedBooking.issue}"</div>
+                   </div>
+                 </div>
+
+                 <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-1">Status</label>
+                      <span className={badgeFn(selectedBooking.status)}>{selectedBooking.status}</span>
                     </div>
-                  </div>
-                </div>
-              </div>
+                    {selectedBooking.doorstepDelivery && (
+                      <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+                         <div className="flex items-center gap-2 text-blue-400 font-bold text-xs mb-2">
+                           <Icon path={ICONS.mapPin} className="w-4 h-4" /> Doorstep Service
+                         </div>
+                         <div className="text-xs text-slate-400 mb-3">{selectedBooking.pickupLocation?.address}</div>
+                         <button onClick={() => setMapModal({ isOpen: true, location: selectedBooking.pickupLocation, vehicle: selectedBooking.vehicleNumber, address: selectedBooking.pickupLocation?.address })}
+                           className="w-full py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold transition-all">
+                           View on Map
+                         </button>
+                      </div>
+                    )}
+                 </div>
+               </div>
 
-              <div className="p-6 space-y-5">
+               {/* Admin Actions */}
+               <div className="border-t border-white/10 pt-6">
+                 <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Update Management</div>
+                 <div className="flex flex-wrap gap-2">
+                    {["Pending", "Accepted", "Rejected", "Completed"].map(st => (
+                      <button key={st} onClick={() => handleUpdateStatus(selectedBooking.id, st)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                          selectedBooking.status === st ? "bg-white text-black" : "bg-white/5 text-slate-400 hover:bg-white/10"
+                        }`}>
+                        {st}
+                      </button>
+                    ))}
+                    <button onClick={() => handleDeleteBooking(selectedBooking.id)}
+                      className="ml-auto px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all border border-red-500/20">
+                      Delete Booking
+                    </button>
+                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-4 gap-3">
-                  {[
-                    { label: 'Total', val: uBookings.length, color: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
-                    { label: 'Accepted', val: uAccepted, color: '#22C55E', bg: 'rgba(34,197,94,0.1)' },
-                    { label: 'Pending', val: uPending, color: '#EAB308', bg: 'rgba(234,179,8,0.1)' },
-                    { label: 'Rejected', val: uRejected, color: '#EF4444', bg: 'rgba(239,68,68,0.1)' },
-                  ].map(s => (
-                    <div key={s.label} className="rounded-xl p-3 text-center" style={{ background: s.bg }}>
-                      <div className="font-black text-2xl" style={{ color: s.color }}>{s.val}</div>
-                      <div className={`text-xs font-medium ${textSecondary}`}>{s.label}</div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* All Bookings */}
-                <div>
-                  <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>All Bookings ({uBookings.length})</div>
-                  {uBookings.length === 0 ? (
-                    <div className={`rounded-xl p-8 text-center`} style={{
-                      background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-                      border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
-                    }}>
-                      <Icon path={ICONS.bookings} className={`w-10 h-10 mx-auto mb-2 ${dark ? 'text-slate-600' : 'text-slate-300'}`} />
-                      <p className={`text-sm ${textSecondary}`}>No bookings yet</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-2">
-                      {uBookings.map(b => (
-                        <div key={b._id}
-                          onClick={() => { setSelectedUser(null); setSelectedBooking(b); }}
-                          className={`rounded-xl p-4 cursor-pointer transition-all`}
-                          style={{
-                            background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.02)',
-                            border: dark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)'
-                          }}>
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="font-mono font-bold text-sm px-2 py-0.5 rounded-lg"
-                              style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.12)' }}>
-                              {b.vehicleNumber}
-                            </span>
-                            <span className={badgeFn(b.status)}>{b.status}</span>
-                            <span className={`ml-auto text-xs ${textSecondary}`}>#{b._id?.slice(-6).toUpperCase()}</span>
-                          </div>
-                          <div className="flex items-center gap-4 text-xs">
-                            <span className={`flex items-center gap-1.5 ${textSecondary}`}>
-                              <Icon path={ICONS.calendar} className="w-3.5 h-3.5" /> {b.serviceDate}
-                            </span>
-                            <span className={`flex items-center gap-1.5 ${textSecondary}`}>
-                              <Icon path={ICONS.clock} className="w-3.5 h-3.5" /> {b.serviceTime}
-                            </span>
-                            {b.doorstepDelivery && (
-                              <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium"
-                                style={{ background: dark ? 'rgba(37,99,235,0.15)' : '#DBEAFE', color: dark ? '#93C5FD' : '#16A34A' }}>
-                                <Icon path={ICONS.truck} className="w-3 h-3" /> Doorstep
-                                {b.doorstepCharge ? ` ₹${b.doorstepCharge}` : ''}
-                              </span>
-                            )}
-                          </div>
-                          {b.issueCategories?.length > 0 && (
-                            <div className="flex flex-wrap gap-1 mt-2">
-                              {b.issueCategories.map((c, i) => (
-                                <span key={i} className="text-xs px-2 py-0.5 rounded-full"
-                                  style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.12)' }}>
-                                  {c}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          {b.pickupLocation?.address && (
-                            <div className={`flex items-start gap-1.5 mt-2 text-xs ${dark ? 'text-green-400' : 'text-green-600'}`}>
-                              <Icon path={ICONS.mapPin} className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" />
-                              <span className="line-clamp-1">{b.pickupLocation.address}</span>
-                            </div>
-                          )}
-                        </div>
+                 {/* Assignment */}
+                 <div className="mt-6">
+                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">Assign Technician</label>
+                    <select 
+                      className={`w-full ${inputClass} text-sm px-4 py-3`}
+                      onChange={(e) => handleAssignStaff(selectedBooking.id, e.target.value)}
+                      value={selectedBooking.staffId?._id || ""}
+                    >
+                      <option value="">Choose technician...</option>
+                      {staff.filter(s => s.status === "Available").map(s => (
+                        <option key={s.id} value={s.id}>{s.name} ({s.specialization})</option>
                       ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Customer Locations */}
-                {uLocations.length > 0 && (
-                  <div>
-                    <div className={`text-xs font-semibold uppercase tracking-widest mb-3 ${textSecondary}`}>Customer Locations ({uLocations.length})</div>
-                    <div className="space-y-2">
-                      {uLocations.map(b => (
-                        <div key={b._id + '-loc'} className="rounded-xl overflow-hidden" style={{
-                          background: dark ? 'rgba(37,99,235,0.06)' : 'rgba(37,99,235,0.03)',
-                          border: dark ? '1px solid rgba(37,99,235,0.15)' : '1px solid rgba(37,99,235,0.12)'
-                        }}>
-                          <div className="p-3">
-                            <div className="flex items-center gap-2 mb-2">
-                              <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg"
-                                style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.12)' }}>
-                                {b.vehicleNumber}
-                              </span>
-                              <span className={`text-xs ${textSecondary}`}>{b.serviceDate}</span>
-                              {b.doorstepDelivery && b.distanceKm && (
-                                <span className={`ml-auto text-xs font-semibold ${dark ? 'text-green-400' : 'text-green-600'}`}>
-                                  {b.distanceKm} km · ₹{b.doorstepCharge || 100}
-                                </span>
-                              )}
-                            </div>
-                            {b.pickupLocation?.address && (
-                              <p className={`text-xs mb-2 ${textPrimary}`}>
-                                <Icon path={ICONS.mapPin} className="w-3 h-3 inline mr-1" style={{ verticalAlign: 'middle' }} />
-                                {b.pickupLocation.address}
-                              </p>
-                            )}
-                            <a
-                              href={`https://www.google.com/maps/dir/?api=1&destination=${b.pickupLocation.lat},${b.pickupLocation.lng}`}
-                              target="_blank" rel="noopener noreferrer"
-                              className="w-full flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:scale-[1.02]"
-                              style={{ background: 'linear-gradient(135deg, #059669, #10B981)' }}>
-                              <Icon path={ICONS.mapPin} className="w-3.5 h-3.5" /> Navigate in Google Maps
-                            </a>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-              </div>
-            </div>
+                    </select>
+                 </div>
+               </div>
+             </div>
           </div>
-        );
-      })()}
-
+        </div>
+      )}
     </div>
   );
 };

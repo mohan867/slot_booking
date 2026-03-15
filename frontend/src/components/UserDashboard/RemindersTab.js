@@ -18,7 +18,7 @@ const RemindersTab = (props) => {
                 const daysLeft = Math.ceil((nextDue - today) / (1000 * 60 * 60 * 24));
 
                 reminders.push({
-                    id: b._id,
+                    id: b.id,
                     vehicleNumber: b.vehicleNumber,
                     lastServiceDate: b.serviceDate,
                     nextServiceDate: nextDue.toISOString().split('T')[0],

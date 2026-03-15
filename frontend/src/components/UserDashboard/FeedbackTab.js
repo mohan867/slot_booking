@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Icon } from './Shared';
+import { submitFeedback, getAllFeedback } from '../../services/firebaseService';
 
 const STAR_PATH = "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.518 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.973 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.921-.755 1.688-1.538 1.118l-3.973-2.888a1 1 0 00-1.175 0l-3.973 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.973-2.888c-.783-.57-.38-1.81.588-1.81h4.915a1 1 0 00.95-.69l1.518-4.674z";
 
@@ -40,52 +41,53 @@ const FeedbackTab = (props) => {
     const [hoverRating, setHoverRating] = useState(0);
     const [comment, setComment] = useState('');
     const [submitted, setSubmitted] = useState(false);
+    const [loading, setLoading] = useState(false);
+    const [feedbacks, setFeedbacks] = useState([]);
 
-    const [feedbacks, setFeedbacks] = useState([
-        {
-            id: 1,
-            customerName: "Alex Morgan",
-            rating: 5,
-            comment: "Exceptional service quality! The mechanics were thorough, professional, and finished ahead of schedule. Highly recommend RMK Garage.",
-            serviceDate: "2025-12-15",
-            avatar: "A",
-        },
-        {
-            id: 2,
-            customerName: "Priya Sharma",
-            rating: 4,
-            comment: "Great experience overall. The doorstep pickup was convenient. Minor delay in delivery but the communication was transparent throughout.",
-            serviceDate: "2025-11-28",
-            avatar: "P",
-        },
-        {
-            id: 3,
-            customerName: "Raj Patel",
-            rating: 5,
-            comment: "Best garage in town. Fair pricing, quality work, and the booking system is super convenient. Will definitely return!",
-            serviceDate: "2025-10-10",
-            avatar: "R",
+    useEffect(() => {
+        if (activeTab === "feedback") {
+            fetchFeedbacks();
         }
-    ]);
+    }, [activeTab]);
 
-    const handleSubmit = (e) => {
+    const fetchFeedbacks = async () => {
+        try {
+            const data = await getAllFeedback();
+            // Sort by date descending
+            setFeedbacks(data.sort((a, b) => new Date(b.serviceDate) - new Date(a.serviceDate)));
+        } catch (err) {
+            console.error("Failed to fetch feedback", err);
+        }
+    };
+
+    const handleSubmit = async (e) => {
         e.preventDefault();
         if (rating === 0) return;
+        setLoading(true);
 
-        const newFeedback = {
-            id: feedbacks.length + 1,
-            customerName: userData?.name || "User",
-            rating: rating,
-            comment: comment || "No comments provided.",
-            serviceDate: new Date().toISOString().split("T")[0],
-            avatar: (userData?.name || "U")[0].toUpperCase(),
-        };
+        try {
+            const newFeedback = {
+                customerName: userData?.name || "User",
+                rating: rating,
+                comment: comment || "No comments provided.",
+                serviceDate: new Date().toISOString().split("T")[0],
+                avatar: (userData?.name || "U")[0].toUpperCase(),
+            };
 
-        setFeedbacks([newFeedback, ...feedbacks]);
-        setRating(0);
-        setComment('');
-        setSubmitted(true);
-        setTimeout(() => setSubmitted(false), 3000);
+            await submitFeedback(newFeedback);
+            
+            // Refresh list
+            fetchFeedbacks();
+            
+            setRating(0);
+            setComment('');
+            setSubmitted(true);
+            setTimeout(() => setSubmitted(false), 3000);
+        } catch (err) {
+            console.error("Failed to submit feedback", err);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const avgRating = feedbacks.length > 0
@@ -194,6 +196,7 @@ const FeedbackTab = (props) => {
                                             placeholder="Share your experience with us..."
                                             value={comment}
                                             onChange={(e) => setComment(e.target.value)}
+                                            disabled={loading}
                                         />
                                     </div>
 
@@ -209,11 +212,17 @@ const FeedbackTab = (props) => {
                                     <button
                                         type="submit"
                                         className="btn-primary w-full py-3 rounded-xl flex items-center justify-center gap-2"
-                                        disabled={rating === 0}
-                                        style={{ opacity: rating === 0 ? 0.4 : 1 }}
+                                        disabled={rating === 0 || loading}
+                                        style={{ opacity: rating === 0 || loading ? 0.4 : 1 }}
                                     >
-                                        <Icon path={ICONS.check} className="w-4 h-4" />
-                                        Submit Review
+                                        {loading ? (
+                                            <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                            </svg> Submitting...</>
+                                        ) : (
+                                            <><Icon path={ICONS.check} className="w-4 h-4" /> Submit Review</>
+                                        )}
                                     </button>
                                 </form>
                             </div>
@@ -230,33 +239,39 @@ const FeedbackTab = (props) => {
                             </div>
 
                             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 custom-scrollbar">
-                                {feedbacks.map((fb) => (
-                                    <div key={fb.id} className="rounded-xl p-5 transition-all duration-300 hover:-translate-y-0.5"
-                                        style={{
-                                            background: '#111827',
-                                            border: '1px solid rgba(255,255,255,0.06)',
-                                            boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
-                                        }}>
-                                        <div className="flex justify-between items-start mb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
-                                                    style={{ background: 'linear-gradient(135deg, #1E40AF, #3B82F6)' }}>
-                                                    {fb.avatar}
-                                                </div>
-                                                <div>
-                                                    <h4 className="font-bold text-sm text-white">{fb.customerName}</h4>
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-xs" style={{ color: '#3D4A5C' }}>{fb.serviceDate}</span>
+                                {feedbacks.length === 0 ? (
+                                    <div className="text-center py-10">
+                                        <p className="text-sm" style={{ color: '#6B7A90' }}>No reviews yet. Be the first to share your experience!</p>
+                                    </div>
+                                ) : (
+                                    feedbacks.map((fb) => (
+                                        <div key={fb.id} className="rounded-xl p-5 transition-all duration-300 hover:-translate-y-0.5"
+                                            style={{
+                                                background: '#111827',
+                                                border: '1px solid rgba(255,255,255,0.06)',
+                                                boxShadow: '0 2px 12px rgba(0,0,0,0.2)',
+                                            }}>
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-sm"
+                                                        style={{ background: 'linear-gradient(135deg, #1E40AF, #3B82F6)' }}>
+                                                        {fb.avatar || (fb.customerName ? fb.customerName[0] : 'U')}
+                                                    </div>
+                                                    <div>
+                                                        <h4 className="font-bold text-sm text-white">{fb.customerName}</h4>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs" style={{ color: '#3D4A5C' }}>{fb.serviceDate}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
+                                                <StarRating rating={fb.rating} size="w-3.5 h-3.5" />
                                             </div>
-                                            <StarRating rating={fb.rating} size="w-3.5 h-3.5" />
+                                            <p className="text-sm leading-relaxed" style={{ color: '#9CA3B4' }}>
+                                                "{fb.comment}"
+                                            </p>
                                         </div>
-                                        <p className="text-sm leading-relaxed" style={{ color: '#9CA3B4' }}>
-                                            "{fb.comment}"
-                                        </p>
-                                    </div>
-                                ))}
+                                    ))
+                                )}
                             </div>
                         </div>
 

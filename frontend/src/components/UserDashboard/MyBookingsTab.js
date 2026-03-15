@@ -39,7 +39,7 @@ const MyBookingsTab = (props) => {
                 };
                 const statusColor = statusColorMap[b.status] || "#FBBF24";
                 return (
-                  <div key={b._id} className="rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
+                  <div key={b.id} className="rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
                     style={{
                       background: '#111827',
                       border: '1px solid rgba(255,255,255,0.06)',
@@ -155,7 +155,7 @@ const MyBookingsTab = (props) => {
                           >
                             Reschedule
                           </button>
-                          <button onClick={() => handleCancelBooking(b._id)}
+                          <button onClick={() => handleCancelBooking(b.id)}
                             className="flex-1 py-2.5 rounded-xl text-xs font-semibold transition-all"
                             style={{
                               background: 'rgba(239,68,68,0.06)',
