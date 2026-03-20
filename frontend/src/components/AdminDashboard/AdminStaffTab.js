@@ -12,7 +12,7 @@ const statusColors = {
   "On Leave": { bg: "rgba(239,68,68,0.1)", color: "#FCA5A5", border: "rgba(239,68,68,0.3)" },
 };
 
-const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass }) => {
+const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiveTab }) => {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
@@ -97,6 +97,12 @@ const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass }) => {
           <p className="text-sm" style={{ color: '#5a6a7a' }}>{staff.length} staff members</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setActiveTab('bookings')}
+            className="flex items-center gap-2 px-5 py-3 rounded-2xl text-white font-semibold text-sm transition-all"
+            style={{ background: 'linear-gradient(135deg, #1E40AF, #3B82F6)', boxShadow: '0 4px 16px rgba(59,130,246,0.3)' }}>
+            <Icon path={ICONS.bookings} className="w-4 h-4" />
+            Manage Bookings
+          </button>
           <button onClick={() => { resetForm(); setShowForm(true); }}
             className="flex items-center gap-2 px-5 py-3 rounded-2xl text-white font-semibold text-sm transition-all"
             style={{ background: "linear-gradient(135deg, #166534, #22C55E)", boxShadow: "0 4px 16px rgba(34,197,94,0.3)" }}>

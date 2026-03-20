@@ -44,7 +44,7 @@ const BookServiceTab = (props) => {
               {/* Service Categories */}
               <div>
                 <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: '#6B7A90' }}>
-                  Service Type (Optional)
+                  Service Type
                 </div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {ISSUE_CATEGORIES.map(cat => {
@@ -122,25 +122,32 @@ const BookServiceTab = (props) => {
                 ) : availableSlots.length > 0 ? (
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#6B7A90' }}>Time Slot</div>
-                    <div className="grid grid-cols-3 gap-1.5">
+                    <div className="grid grid-cols-2 gap-1.5">
                       {availableSlots.map((slot, i) => {
-                        const full = slot.available === 0;
-                        const selected = formData.serviceTime === slot.time;
+                        if (i >= availableSlots.length - 1) return null;
+
+                        const nextSlot = availableSlots[i + 1];
+                        const timeRange = `${slot.time} - ${nextSlot.time}`;
+                        
+                        // A slot is unavailable if the START time of the range is booked.
+                        const isFull = !slot.isAvailable;
+                        const isSelected = formData.serviceTime === timeRange;
+
                         return (
                           <button key={i} type="button"
-                            onClick={() => !full && handleSlotSelect(slot)}
+                            onClick={() => !isFull && handleSlotSelect({ time: timeRange, isAvailable: true })}
                             className="py-2 rounded-lg text-xs font-semibold transition-all"
                             style={{
-                              opacity: full ? 0.3 : 1,
-                              cursor: full ? 'not-allowed' : 'pointer',
-                              background: selected ? 'linear-gradient(135deg, #1E40AF, #3B82F6)' : '#0F1520',
-                              border: selected ? '1px solid rgba(37,99,235,0.5)' : '1px solid rgba(255,255,255,0.06)',
-                              color: selected ? '#fff' : '#6B7A90',
-                              boxShadow: selected ? '0 4px 16px rgba(37,99,235,0.3)' : 'none',
-                              transform: selected ? 'scale(1.05)' : 'scale(1)',
+                              opacity: isFull ? 0.4 : 1,
+                              cursor: isFull ? 'not-allowed' : 'pointer',
+                              background: isSelected ? 'linear-gradient(135deg, #1E40AF, #3B82F6)' : '#0F1520',
+                              border: isSelected ? '1px solid rgba(37,99,235,0.5)' : '1px solid rgba(255,255,255,0.06)',
+                              color: isSelected ? '#fff' : '#6B7A90',
+                              boxShadow: isSelected ? '0 4px 16px rgba(37,99,235,0.3)' : 'none',
+                              transform: isSelected ? 'scale(1.05)' : 'scale(1)',
                             }}
                           >
-                            {slot.time}
+                            {timeRange}
                           </button>
                         );
                       })}
@@ -198,147 +205,66 @@ const BookServiceTab = (props) => {
                         doorstepDelivery: !p.doorstepDelivery,
                         ...(!p.doorstepDelivery ? {} : { pickupLocation: null, doorstepCharge: 0, distanceKm: 0 })
                       }))}
-                      disabled={loading}
-                      className="relative flex-shrink-0 ml-3 transition-all duration-300 focus:outline-none"
-                      style={{
-                        width: 48, height: 26, borderRadius: 13,
-                        background: formData.doorstepDelivery
-                          ? 'linear-gradient(135deg, #3B82F6, #60A5FA)' : 'rgba(255,255,255,0.08)',
-                        cursor: loading ? 'not-allowed' : 'pointer',
-                        boxShadow: formData.doorstepDelivery ? '0 0 12px rgba(37,99,235,0.3)' : 'none',
-                      }}
+                      className={`w-12 h-6 rounded-full flex items-center transition-colors p-1 ${formData.doorstepDelivery ? 'bg-blue-600 justify-end' : 'bg-gray-700 justify-start'}`}
                     >
-                      <span
-                        className="block rounded-full shadow-lg transition-all duration-300"
-                        style={{
-                          width: 20, height: 20,
-                          marginTop: 3,
-                          marginLeft: formData.doorstepDelivery ? 25 : 3,
-                          background: '#FFFFFF',
-                          boxShadow: '0 2px 6px rgba(0,0,0,0.2)',
-                        }}
-                      />
+                      <span className="w-4 h-4 bg-white rounded-full transition-transform" />
                     </button>
                   </div>
 
-                  {/* Map & Pricing Panel */}
+                  {/* Location Input (conditional) */}
                   {formData.doorstepDelivery && (
-                    <div className="animate-fadeIn">
-                      {/* Action Buttons */}
-                      <div className="px-5 pb-3 flex flex-wrap gap-2">
-                        <button type="button" onClick={handleUseMyLocation} disabled={locatingUser}
-                          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all text-white"
-                          style={{
-                            background: 'linear-gradient(135deg, #166534, #22C55E)',
-                            opacity: locatingUser ? 0.7 : 1,
-                            cursor: locatingUser ? 'wait' : 'pointer',
-                          }}>
-                          {locatingUser ? (
-                            <><svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
-                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg> Locating...</>
-                          ) : (
-                            <><Icon path={ICONS.mapPin} className="w-3.5 h-3.5" /> Use My Location</>
-                          )}
-                        </button>
-                        <div className="flex items-center gap-1 text-xs" style={{ color: '#3D4A5C' }}>
-                          <Icon path={ICONS.info} className="w-3 h-3" />
-                          or click on the map to set pickup point
-                        </div>
+                    <div className="p-5 pt-0 animate-fadeIn">
+                      <div className="floating-group">
+                        <input
+                          type="text" name="pickupAddress" id="pickupAddress"
+                          placeholder=" "
+                          className={`${inputClass} w-full px-4 text-sm`}
+                          value={formData.pickupAddress || ''}
+                          onChange={handleInputChange}
+                          required={formData.doorstepDelivery}
+                          disabled={loading}
+                        />
+                        <label htmlFor="pickupAddress" className={`floating-label ${labelClass}`}>
+                          Pickup Address
+                        </label>
                       </div>
-
-                      {/* Map Container */}
-                      <div className="px-5 pb-4">
-                        <div style={{
-                          borderRadius: 16, overflow: 'hidden', height: 280,
-                          border: '1px solid rgba(255,255,255,0.08)',
-                        }}>
-                          <div ref={mapContainerRef} style={{ width: '100%', height: '100%' }} />
-                        </div>
-                      </div>
-
-                      {/* Location & Pricing Info */}
-                      {formData.pickupLocation && (
-                        <div className="px-5 pb-5 space-y-3 animate-fadeIn">
-                          {/* Selected Address */}
-                          <div className="rounded-xl p-3"
-                            style={{ background: '#0F1520', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div className="text-xs font-semibold uppercase tracking-widest mb-1.5" style={{ color: '#6B7A90' }}>Pickup Address</div>
-                            <p className="text-xs leading-relaxed text-white">
-                              {formData.pickupLocation.address?.substring(0, 120)}{formData.pickupLocation.address?.length > 120 ? '...' : ''}
-                            </p>
-                          </div>
-
-                          {/* Distance & Pricing Card */}
-                          <div className="rounded-xl overflow-hidden"
-                            style={{ background: '#0F1520', border: '1px solid rgba(255,255,255,0.05)' }}>
-                            <div className="p-3 grid grid-cols-3 gap-3">
-                              <div className="text-center">
-                                <div className="text-lg font-black text-green-400">
-                                  {formData.distanceKm} <span className="text-xs font-semibold">km</span>
-                                </div>
-                                <div className="text-xs" style={{ color: '#6B7A90' }}>Distance</div>
-                              </div>
-                              <div className="text-center"
-                                style={{ borderLeft: '1px solid rgba(255,255,255,0.05)', borderRight: '1px solid rgba(255,255,255,0.05)' }}>
-                                <div className="text-lg font-black text-emerald-400">₹{formData.doorstepCharge}</div>
-                                <div className="text-xs" style={{ color: '#6B7A90' }}>Delivery Fee</div>
-                              </div>
-                              <div className="text-center flex flex-col items-center justify-center">
-                                <a
-                                  href={`https://www.google.com/maps/dir/${SHOP_LOCATION.lat},${SHOP_LOCATION.lng}/${formData.pickupLocation.lat},${formData.pickupLocation.lng}`}
-                                  target="_blank" rel="noopener noreferrer"
-                                  className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
-                                  style={{ background: 'linear-gradient(135deg, #166534, #22C55E)' }}>
-                                  <Icon path={ICONS.mapPin} className="w-3 h-3" /> Navigate
-                                </a>
-                              </div>
-                            </div>
-
-                            {/* Pricing Breakdown */}
-                            <div className="px-3 pb-3">
-                              <div className="rounded-lg p-2.5 text-xs leading-relaxed"
-                                style={{ background: 'rgba(255,255,255,0.02)', color: '#6B7A90' }}>
-                                {formData.distanceKm <= 10 ? (
-                                  <div className="flex items-center gap-2">
-                                    <Icon path={ICONS.check} className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
-                                    <span>Within 10 km — Flat rate <strong className="text-emerald-400">₹100</strong></span>
-                                  </div>
-                                ) : (
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <Icon path={ICONS.info} className="w-3.5 h-3.5 flex-shrink-0 text-green-400" />
-                                      <span>Base charge (first 10 km): <strong>₹100</strong></span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                      <Icon path={ICONS.plus} className="w-3.5 h-3.5 flex-shrink-0 text-green-400" />
-                                      <span>Extra {Math.ceil(formData.distanceKm - 10)} km × ₹10 = <strong>₹{Math.ceil(formData.distanceKm - 10) * 10}</strong></span>
-                                    </div>
-                                    <div className="flex items-center gap-2 pt-1" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                                      <Icon path={ICONS.check} className="w-3.5 h-3.5 flex-shrink-0 text-emerald-400" />
-                                      <span>Total delivery fee: <strong className="text-emerald-400">₹{formData.doorstepCharge}</strong></span>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      )}
+                      <button type="button" onClick={handleUseMyLocation} disabled={locatingUser}
+                        className="mt-2 flex items-center gap-2 text-xs font-semibold"
+                        style={{ color: '#60A5FA' }}>
+                        {locatingUser ? (
+                          <>
+                            <div className="w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />
+                            Locating...
+                          </>
+                        ) : (
+                          <>
+                            <Icon path={ICONS.locate} className="w-3.5 h-3.5" />
+                            Use My Current Location
+                          </>
+                        )}
+                      </button>
                     </div>
                   )}
                 </div>
               )}
 
-              <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">
+              {/* Map container */}
+              <div ref={mapContainerRef} style={{ height: formData.doorstepDelivery ? 200 : 0, transition: 'height 0.4s' }} className="rounded-xl overflow-hidden" />
+
+              {/* Submit Button */}
+              <button type="submit" disabled={loading}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl text-sm font-bold text-white transition-all"
+                style={{
+                  background: 'linear-gradient(135deg, #1E40AF, #3B82F6)',
+                  boxShadow: '0 8px 24px rgba(37,99,235,0.3)',
+                }}>
                 {loading ? (
-                  <><svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                  </svg>Processing...</>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  <><Icon path={ICONS.check} className="w-4 h-4" />Submit Booking</>
+                  <>
+                    <Icon path={ICONS.check} className="w-4 h-4" />
+                    Confirm Booking
+                  </>
                 )}
               </button>
             </form>

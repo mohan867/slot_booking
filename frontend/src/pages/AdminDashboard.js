@@ -5,16 +5,21 @@ import {
   listenAllBookings, 
   listenAllUsers, 
   listenAllStaff,
+  listenNotificationsForCurrentUser,
+  markNotificationSeen,
   updateBookingStatus,
   assignStaffToBooking,
+  updateBookingPayment,
   deleteBooking
 } from "../services/firebaseService";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import AdminDashboardTab from '../components/AdminDashboard/AdminDashboardTab';
 import AdminBookingsTab from '../components/AdminDashboard/AdminBookingsTab';
+import AdminPaymentsTab from '../components/AdminDashboard/AdminPaymentsTab';
 import AdminUsersTab from '../components/AdminDashboard/AdminUsersTab';
 import AdminStaffTab from '../components/AdminDashboard/AdminStaffTab';
+import UserDetailModal from '../components/AdminDashboard/UserDetailModal';
 
 
 /* ── Shop Location (RMK Garage) ─── */
@@ -80,8 +85,10 @@ const getStatusBadge = (status, dark) => {
     Rejected: "badge-rejected-light",
     Assigned: "badge-assigned-light",
     "In Progress": "badge-inprogress-light",
-    Completed: "badge-completed-light"
+    Completed: "badge-completed-light",
+    "On Hold": "badge-rejected-light" // Reusing rejected colors (red/orange) or custom
   };
+  if (status === "On Hold") return "bg-orange-50 text-orange-600 border border-orange-200 px-3 py-1 rounded-full text-xs font-semibold";
   return map[status] || "badge-pending-light";
 };
 
@@ -90,7 +97,8 @@ const getStatusBadge = (status, dark) => {
 const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, sidebarOpen, setSidebarOpen }) => {
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: ICONS.dashboard },
-    { id: "bookings", label: "Manage Bookings", icon: ICONS.bookings },
+    { id: "bookings", label: "Booking Management", icon: ICONS.bookings },
+    { id: "payments", label: "Payments", icon: ICONS.calendar },
     { id: "users", label: "System Users", icon: ICONS.users },
     { id: "staff", label: "Staff Directory", icon: ICONS.shield },
   ];
@@ -184,6 +192,16 @@ const AdminDashboard = () => {
   const [filterStatus, setFilterStatus] = useState("All");
   const [selectedBooking, setSelectedBooking] = useState(null);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedTechnician, setSelectedTechnician] = useState("");
+  const [paymentDraft, setPaymentDraft] = useState({
+    invoiceNo: "",
+    laborCharge: 0,
+    partsCharge: 0,
+    doorstepCharge: 0,
+    discount: 0,
+    tax: 0,
+    notes: "",
+  });
 
   /* ── Map Modal State ── */
   const [mapModal, setMapModal] = useState({ isOpen: false, location: null, vehicle: "", address: "" });
@@ -192,6 +210,7 @@ const AdminDashboard = () => {
   const markerRef = useRef(null);
   const routeLineRef = useRef(null);
   const shopMarkerRef = useRef(null);
+  const notificationsReadyRef = useRef(false);
 
   useEffect(() => {
     fetchProfile();
@@ -208,6 +227,25 @@ const AdminDashboard = () => {
     };
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = listenNotificationsForCurrentUser(async (items) => {
+      if (!notificationsReadyRef.current) {
+        notificationsReadyRef.current = true;
+        return;
+      }
+
+      const nextUnread = items.find((n) => !n.seen);
+      if (!nextUnread) return;
+
+      showMessage(nextUnread.message || "New admin notification", "success");
+      try {
+        await markNotificationSeen(nextUnread.id || nextUnread._id);
+      } catch { }
+    }, "admin");
+
+    return () => unsubscribe();
+  }, []);
+
   const fetchProfile = async () => {
     try {
       const profile = await getCurrentUserProfile();
@@ -219,6 +257,32 @@ const AdminDashboard = () => {
     if (filterStatus === "All") return bookings;
     return bookings.filter(b => b.status === filterStatus);
   }, [bookings, filterStatus]);
+
+  useEffect(() => {
+    if (!selectedBooking?.payment) {
+      setPaymentDraft({
+        invoiceNo: selectedBooking?.payment?.invoiceNo || "",
+        laborCharge: 0,
+        partsCharge: 0,
+        doorstepCharge: Number(selectedBooking?.doorstepCharge || 0),
+        discount: 0,
+        tax: 0,
+        notes: "",
+      });
+      return;
+    }
+
+    const p = selectedBooking.payment;
+    setPaymentDraft({
+      invoiceNo: p.invoiceNo || "",
+      laborCharge: Number(p.laborCharge || 0),
+      partsCharge: Number(p.partsCharge || 0),
+      doorstepCharge: Number(p.doorstepCharge || 0),
+      discount: Number(p.discount || 0),
+      tax: Number(p.tax || 0),
+      notes: p.notes || "",
+    });
+  }, [selectedBooking]);
 
   const handleUpdateStatus = async (id, status) => {
     setLoading(true);
@@ -253,6 +317,33 @@ const AdminDashboard = () => {
     } catch (err) {
       showMessage(err.message || "Delete failed", "error");
     } finally { setLoading(false); }
+  };
+
+  const handleSavePayment = async () => {
+    if (!selectedBooking?.id) return;
+    if (selectedBooking?.payment?.status === "Paid") {
+      showMessage("Paid payments are view-only and cannot be edited", "error");
+      return;
+    }
+    setLoading(true);
+    try {
+      const payload = {
+        invoiceNo: paymentDraft.invoiceNo,
+        laborCharge: Number(paymentDraft.laborCharge || 0),
+        partsCharge: Number(paymentDraft.partsCharge || 0),
+        doorstepCharge: Number(paymentDraft.doorstepCharge || 0),
+        discount: Number(paymentDraft.discount || 0),
+        tax: Number(paymentDraft.tax || 0),
+        notes: paymentDraft.notes || "",
+      };
+      const saved = await updateBookingPayment(selectedBooking.id, payload);
+      setSelectedBooking(prev => ({ ...prev, payment: saved }));
+      showMessage("Payment details updated", "success");
+    } catch (err) {
+      showMessage(err.message || "Failed to save payment", "error");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleLogout = async () => {
@@ -314,6 +405,22 @@ const AdminDashboard = () => {
   const cardClass = dark ? "card-dark" : "card-light";
   const inputClass = dark ? "input-dark" : "input-light";
   const badgeFn = (s) => getStatusBadge(s, dark);
+  const isPaymentEditable = selectedBooking?.payment?.status !== "Paid";
+  const selectedPayment = selectedBooking?.payment || {};
+  const selectedIssueLines = Array.isArray(selectedPayment.issueLines) ? selectedPayment.issueLines : [];
+  const selectedPartLines = Array.isArray(selectedPayment.partLines) ? selectedPayment.partLines : [];
+  const selectedIssueTotal = selectedIssueLines.length
+    ? selectedIssueLines.reduce((sum, line) => sum + Number(line.amount || 0), 0)
+    : Number(selectedPayment.laborCharge || 0);
+  const selectedPartsTotal = selectedPartLines.length
+    ? selectedPartLines.reduce((sum, line) => sum + Number(line.amount || (Number(line.qty || 0) * Number(line.unitPrice || 0))), 0)
+    : Number(selectedPayment.partsCharge || 0);
+  const selectedDoorstep = Number(selectedPayment.doorstepCharge || 0);
+  const selectedDiscount = Number(selectedPayment.discount || 0);
+  const selectedTax = Number(selectedPayment.tax || 0);
+  const selectedGrandTotal = Number(
+    selectedPayment.totalAmount ?? Math.max(0, selectedIssueTotal + selectedPartsTotal + selectedDoorstep + selectedTax - selectedDiscount)
+  );
 
   const stats = {
     total: bookings.length,
@@ -387,10 +494,11 @@ const AdminDashboard = () => {
             </div>
           )}
 
-          <AdminDashboardTab {...commonProps} />
-          <AdminBookingsTab {...commonProps} />
-          <AdminUsersTab {...commonProps} />
-          <AdminStaffTab {...commonProps} />
+          {activeTab === "dashboard" && <AdminDashboardTab {...commonProps} />}
+          {activeTab === "bookings" && <AdminBookingsTab {...commonProps} />}
+          {activeTab === "payments" && <AdminPaymentsTab {...commonProps} />}
+          {activeTab === "users" && <AdminUsersTab {...commonProps} />}
+          {activeTab === "staff" && <AdminStaffTab {...commonProps} />}
         </main>
       </div>
 
@@ -437,17 +545,17 @@ const AdminDashboard = () => {
       )}
 
       {/* ── Booking Details Modal ── */}
-      {selectedBooking && activeTab === "bookings" && (
+      {selectedBooking && (activeTab === "bookings" || activeTab === "payments") && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 animate-fadeIn" onClick={() => setSelectedBooking(null)} />
-          <div className={`relative z-10 w-full max-w-2xl rounded-3xl overflow-hidden animate-fadeInUp ${dark ? "glass-dark" : "bg-white shadow-2xl"}`}>
-             <div className="p-8">
+          <div className="absolute inset-0 bg-black/80 animate-fadeIn" onClick={() => { setSelectedBooking(null); setSelectedTechnician(""); }} />
+          <div className={`relative z-10 w-full max-w-2xl max-h-[92vh] rounded-3xl overflow-hidden animate-fadeInUp ${dark ? "glass-dark" : "bg-white shadow-2xl"}`}>
+             <div className="p-8 max-h-[92vh] overflow-y-auto">
                <div className="flex justify-between items-start mb-6">
                  <div>
                    <h3 className="text-2xl font-bold text-white mb-1">Booking Details</h3>
                    <p className="text-sm text-slate-500">ID: {selectedBooking.id}</p>
                  </div>
-                 <button onClick={() => setSelectedBooking(null)} className="text-slate-500 hover:text-white transition-colors">
+                 <button onClick={() => { setSelectedBooking(null); setSelectedTechnician(""); }} className="text-slate-500 hover:text-white transition-colors">
                    <Icon path={ICONS.close} className="w-6 h-6" />
                  </button>
                </div>
@@ -488,16 +596,177 @@ const AdminDashboard = () => {
                  </div>
                </div>
 
+               {selectedBooking.status === "Completed" && (
+                 <div className="mb-8 rounded-2xl p-4 border border-blue-500/20 bg-blue-500/5">
+                   <div className="text-[10px] font-bold text-blue-300 uppercase tracking-widest mb-4">
+                     {isPaymentEditable ? "Payment Copy (Admin Editable)" : "Payment Copy (Paid - View Only)"}
+                   </div>
+                   {isPaymentEditable ? (
+                     <>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                         <input
+                           className={`w-full ${inputClass} text-sm px-4 py-2.5`}
+                           placeholder="Invoice Number"
+                           value={paymentDraft.invoiceNo}
+                           onChange={(e) => setPaymentDraft(prev => ({ ...prev, invoiceNo: e.target.value }))}
+                           disabled={!isPaymentEditable}
+                         />
+                         <input
+                           type="number"
+                           className={`w-full ${inputClass} text-sm px-4 py-2.5`}
+                           placeholder="Labor Charge"
+                           value={paymentDraft.laborCharge}
+                           onChange={(e) => setPaymentDraft(prev => ({ ...prev, laborCharge: e.target.value }))}
+                           disabled={!isPaymentEditable}
+                         />
+                         <input
+                           type="number"
+                           className={`w-full ${inputClass} text-sm px-4 py-2.5`}
+                           placeholder="Parts Charge"
+                           value={paymentDraft.partsCharge}
+                           onChange={(e) => setPaymentDraft(prev => ({ ...prev, partsCharge: e.target.value }))}
+                           disabled={!isPaymentEditable}
+                         />
+                         <input
+                           type="number"
+                           className={`w-full ${inputClass} text-sm px-4 py-2.5`}
+                           placeholder="Doorstep Charge"
+                           value={paymentDraft.doorstepCharge}
+                           onChange={(e) => setPaymentDraft(prev => ({ ...prev, doorstepCharge: e.target.value }))}
+                           disabled={!isPaymentEditable}
+                         />
+                         <input
+                           type="number"
+                           className={`w-full ${inputClass} text-sm px-4 py-2.5`}
+                           placeholder="Discount"
+                           value={paymentDraft.discount}
+                           onChange={(e) => setPaymentDraft(prev => ({ ...prev, discount: e.target.value }))}
+                           disabled={!isPaymentEditable}
+                         />
+                         <input
+                           type="number"
+                           className={`w-full ${inputClass} text-sm px-4 py-2.5`}
+                           placeholder="Tax"
+                           value={paymentDraft.tax}
+                           onChange={(e) => setPaymentDraft(prev => ({ ...prev, tax: e.target.value }))}
+                           disabled={!isPaymentEditable}
+                         />
+                       </div>
+                       <textarea
+                         className={`w-full ${inputClass} text-sm px-4 py-2.5 mb-3 min-h-[72px]`}
+                         placeholder="Notes"
+                         value={paymentDraft.notes}
+                         onChange={(e) => setPaymentDraft(prev => ({ ...prev, notes: e.target.value }))}
+                         disabled={!isPaymentEditable}
+                       />
+                     </>
+                   ) : (
+                     <>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3 text-sm">
+                         <div className="rounded-xl px-4 py-3 bg-white/5 border border-white/10">
+                           <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Invoice Number</div>
+                           <div className="font-semibold text-white">{selectedPayment.invoiceNo || '-'}</div>
+                         </div>
+                         <div className="rounded-xl px-4 py-3 bg-white/5 border border-white/10">
+                           <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Doorstep Amount</div>
+                           <div className="font-semibold text-white">Rs {selectedDoorstep.toFixed(2)}</div>
+                         </div>
+                         <div className="rounded-xl px-4 py-3 bg-white/5 border border-white/10">
+                           <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Discount</div>
+                           <div className="font-semibold text-white">Rs {selectedDiscount.toFixed(2)}</div>
+                         </div>
+                         <div className="rounded-xl px-4 py-3 bg-white/5 border border-white/10">
+                           <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Tax</div>
+                           <div className="font-semibold text-white">Rs {selectedTax.toFixed(2)}</div>
+                         </div>
+                       </div>
+
+                       <div className="mb-3">
+                         <div className="text-[10px] font-bold text-sky-300 uppercase tracking-widest mb-2">Issue Charges</div>
+                         <div className="space-y-2">
+                           {selectedIssueLines.length > 0 ? selectedIssueLines.map((line, idx) => (
+                             <div key={`readonly-issue-${idx}`} className="flex items-center justify-between rounded-xl px-4 py-2.5 bg-white/5 border border-white/10">
+                               <div className="text-sm text-slate-200">{line.name || `Issue ${idx + 1}`}</div>
+                               <div className="text-sm font-semibold text-white">Rs {Number(line.amount || 0).toFixed(2)}</div>
+                             </div>
+                           )) : (
+                             <div className="flex items-center justify-between rounded-xl px-4 py-2.5 bg-white/5 border border-white/10">
+                               <div className="text-sm text-slate-200">Labor Charge</div>
+                               <div className="text-sm font-semibold text-white">Rs {selectedIssueTotal.toFixed(2)}</div>
+                             </div>
+                           )}
+                         </div>
+                       </div>
+
+                       <div className="mb-3">
+                         <div className="text-[10px] font-bold text-emerald-300 uppercase tracking-widest mb-2">Parts Added</div>
+                         <div className="space-y-2">
+                           {selectedPartLines.length > 0 ? selectedPartLines.map((line, idx) => (
+                             <div key={`readonly-part-${idx}`} className="grid grid-cols-1 md:grid-cols-[1fr_auto_auto] gap-2 md:gap-3 rounded-xl px-4 py-2.5 bg-white/5 border border-white/10 items-center">
+                               <div className="text-sm text-slate-200">{line.name || `Part ${idx + 1}`}</div>
+                               <div className="text-xs text-slate-400">Qty {Number(line.qty || 0)} x Rs {Number(line.unitPrice || 0).toFixed(2)}</div>
+                               <div className="text-sm font-semibold text-white">Rs {Number(line.amount || (Number(line.qty || 0) * Number(line.unitPrice || 0))).toFixed(2)}</div>
+                             </div>
+                           )) : (
+                             <div className="flex items-center justify-between rounded-xl px-4 py-2.5 bg-white/5 border border-white/10">
+                               <div className="text-sm text-slate-200">Parts Charge</div>
+                               <div className="text-sm font-semibold text-white">Rs {selectedPartsTotal.toFixed(2)}</div>
+                             </div>
+                           )}
+                         </div>
+                       </div>
+
+                       <div className="rounded-xl px-4 py-3 bg-white/5 border border-white/10 mb-3">
+                         <div className="text-[10px] uppercase tracking-widest text-slate-400 mb-1">Notes</div>
+                         <div className="text-sm text-slate-200">{selectedPayment.notes || '-'}</div>
+                       </div>
+                     </>
+                   )}
+                   <div className="flex items-center justify-between gap-3">
+                     <div className="text-sm text-blue-200 font-semibold">
+                       {isPaymentEditable ? (
+                         <>Total: Rs {Math.max(0,
+                           Number(paymentDraft.laborCharge || 0) +
+                           Number(paymentDraft.partsCharge || 0) +
+                           Number(paymentDraft.doorstepCharge || 0) +
+                           Number(paymentDraft.tax || 0) -
+                           Number(paymentDraft.discount || 0)
+                         ).toFixed(2)}</>
+                       ) : (
+                         <>
+                           <div>Issue Total: Rs {selectedIssueTotal.toFixed(2)}</div>
+                           <div>Parts Total: Rs {selectedPartsTotal.toFixed(2)}</div>
+                           <div>Total: Rs {selectedGrandTotal.toFixed(2)}</div>
+                         </>
+                       )}
+                     </div>
+                     <button
+                       onClick={handleSavePayment}
+                       disabled={loading || !isPaymentEditable}
+                       className="px-4 py-2 rounded-xl text-xs font-bold bg-blue-600 hover:bg-blue-500 text-white transition-all disabled:opacity-50"
+                     >
+                       {loading ? "Saving..." : isPaymentEditable ? "Save Payment" : "Paid (Locked)"}
+                     </button>
+                   </div>
+                   {selectedBooking.payment?.status === "Paid" && (
+                     <div className="mt-3 text-xs text-emerald-400 font-semibold">Payment Status: Paid</div>
+                   )}
+                 </div>
+               )}
+
                {/* Admin Actions */}
                <div className="border-t border-white/10 pt-6">
                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Update Management</div>
                  <div className="flex flex-wrap gap-2">
-                    {["Pending", "Accepted", "Rejected", "Completed"].map(st => (
-                      <button key={st} onClick={() => handleUpdateStatus(selectedBooking.id, st)}
+                    {[
+                      { label: "Confirm", value: "Accepted" },
+                      { label: "Reject", value: "Rejected" }
+                    ].map(st => (
+                      <button key={st.value} onClick={() => handleUpdateStatus(selectedBooking.id, st.value)}
                         className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                          selectedBooking.status === st ? "bg-white text-black" : "bg-white/5 text-slate-400 hover:bg-white/10"
+                          selectedBooking.status === st.value ? "bg-white text-black" : "bg-white/5 text-slate-400 hover:bg-white/10"
                         }`}>
-                        {st}
+                        {st.label}
                       </button>
                     ))}
                     <button onClick={() => handleDeleteBooking(selectedBooking.id)}
@@ -509,22 +778,50 @@ const AdminDashboard = () => {
                  {/* Assignment */}
                  <div className="mt-6">
                     <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">Assign Technician</label>
-                    <select 
-                      className={`w-full ${inputClass} text-sm px-4 py-3`}
-                      onChange={(e) => handleAssignStaff(selectedBooking.id, e.target.value)}
-                      value={selectedBooking.staffId?._id || ""}
-                    >
-                      <option value="">Choose technician...</option>
-                      {staff.filter(s => s.status === "Available").map(s => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.specialization})</option>
-                      ))}
-                    </select>
+                    {staff.filter(s => s.status === "Available").length > 0 ? (
+                      <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/30">
+                        <select 
+                          className={`w-full ${inputClass} text-sm px-4 py-3 mb-3`}
+                          onChange={(e) => {
+                            if (e.target.value) {
+                              handleAssignStaff(selectedBooking.id, e.target.value);
+                              setSelectedTechnician("");
+                            }
+                          }}
+                          value={selectedTechnician}
+                        >
+                          <option value="">Choose available technician...</option>
+                          {staff.filter(s => s.status === "Available").map(s => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.specialization})</option>
+                          ))}
+                        </select>
+                        <p className="text-xs text-green-400 font-semibold">✓ Staff is available. Select a technician to assign this task.</p>
+                      </div>
+                    ) : (
+                      <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/30">
+                        <p className="text-xs text-orange-400 font-semibold">⚠ No staff available at the moment. Please try again later.</p>
+                      </div>
+                    )}
                  </div>
                </div>
              </div>
           </div>
         </div>
       )}
+
+      {/* ── User Detail Modal ── */}
+      <UserDetailModal
+        selectedUser={selectedUser}
+        onClose={() => setSelectedUser(null)}
+        bookings={bookings}
+        dark={dark}
+        badgeFn={badgeFn}
+        textPrimary={textPrimary}
+        textSecondary={textSecondary}
+        cardClass={cardClass}
+        setActiveTab={setActiveTab}
+        setSelectedBooking={setSelectedBooking}
+      />
     </div>
   );
 };

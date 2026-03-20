@@ -226,7 +226,7 @@ const AdminDashboardTab = (props) => {
                 const statusColor = b.status === "Pending" ? "#FBBF24" : b.status === "Accepted" ? "#22C55E" : "#F87171";
                 return (
                   <div key={b.id} className="flex items-center gap-3 p-2.5 rounded-xl transition-all cursor-pointer hover:bg-white/5"
-                    onClick={() => setSelectedBooking(b)}>
+                    onClick={() => { setActiveTab('bookings'); setSelectedBooking(b); }}>
                     <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0"
                       style={{ background: `linear-gradient(135deg, ${statusColor}, ${statusColor}99)` }}>
                       {(b.customerName || b.userId?.name || "?")[0].toUpperCase()}

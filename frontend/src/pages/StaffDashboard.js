@@ -3,7 +3,8 @@ import {
   logoutUser, 
   getCurrentUserProfile, 
   listenStaffBookings, 
-  updateBookingProgress 
+  updateBookingProgress,
+  staffGenerateBookingPayment 
 } from "../services/firebaseService";
 
 const Icon = ({ path, className = "w-5 h-5", style }) => (
@@ -32,6 +33,17 @@ const ICONS = {
 
 const SHOP_LOCATION = { lat: 13.0827, lng: 80.2707 };
 
+const createIssueLine = (name = "", amount = 0) => ({
+  name,
+  amount,
+});
+
+const createPartLine = (name = "", qty = 1, unitPrice = 0) => ({
+  name,
+  qty,
+  unitPrice,
+});
+
 const getStatusColor = (status) => {
   const map = {
     Assigned: { bg: "rgba(59,130,246,0.12)", color: "#60A5FA", border: "rgba(59,130,246,0.25)" },
@@ -58,6 +70,18 @@ const StaffDashboard = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [filterStatus, setFilterStatus] = useState("All");
   const [selectedTask, setSelectedTask] = useState(null);
+  const [paymentLoading, setPaymentLoading] = useState(false);
+  const [paymentDraft, setPaymentDraft] = useState({
+    invoiceNo: "",
+    laborCharge: 0,
+    partsCharge: 0,
+    doorstepCharge: 0,
+    discount: 0,
+    tax: 0,
+    notes: "",
+    issueLines: [],
+    partLines: [],
+  });
 
   useEffect(() => {
     fetchProfile();
@@ -79,10 +103,36 @@ const StaffDashboard = () => {
       if (selectedTask && selectedTask.id === bookingId) {
         setSelectedTask(prev => ({ ...prev, status }));
       }
+      if (status === "In Progress") {
+        window.alert("Service started successfully. User and admin have been notified.");
+      }
+      if (status === "Completed") {
+        // After completing a task, check and update staff availability
+        updateStaffAvailability(staffInfo.uid, tasks);
+      }
     } catch (e) {
       console.error(e);
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const updateStaffAvailability = async (staffId, allTasks) => {
+    const activeTasks = allTasks.filter(task => 
+      task.staffId === staffId && 
+      task.status !== "Completed" && 
+      task.status !== "Cancelled"
+    );
+    
+    const newStatus = activeTasks.length > 0 ? "Busy" : "Available";
+    
+    try {
+      // Assuming you have a function to update the staff's status in Firebase
+      // This function would need to be created in firebaseService.js
+      // await updateStaffStatus(staffId, newStatus);
+      console.log(`Staff ${staffId} status updated to ${newStatus}`);
+    } catch (error) {
+      console.error("Error updating staff status:", error);
     }
   };
 
@@ -102,6 +152,93 @@ const StaffDashboard = () => {
   const filteredTasks = tasks.filter(t =>
     filterStatus === "All" ? true : t.status === filterStatus
   );
+
+  useEffect(() => {
+    if (!selectedTask) return;
+    const p = selectedTask.payment || {};
+    const fallbackIssueLines = (selectedTask.issueCategories || []).map((cat) => createIssueLine(cat, 0));
+    setPaymentDraft({
+      invoiceNo: p.invoiceNo || "",
+      laborCharge: Number(p.laborCharge || 0),
+      partsCharge: Number(p.partsCharge || 0),
+      doorstepCharge: Number(p.doorstepCharge || selectedTask.doorstepCharge || 0),
+      discount: Number(p.discount || 0),
+      tax: Number(p.tax || 0),
+      notes: p.notes || "",
+      issueLines: Array.isArray(p.issueLines) && p.issueLines.length > 0
+        ? p.issueLines.map((line) => createIssueLine(line.name || "", Number(line.amount || 0)))
+        : fallbackIssueLines,
+      partLines: Array.isArray(p.partLines) && p.partLines.length > 0
+        ? p.partLines.map((line) => createPartLine(line.name || "", Number(line.qty || 1), Number(line.unitPrice || 0)))
+        : [createPartLine("", 1, 0)],
+    });
+  }, [selectedTask]);
+
+  const updateIssueLine = (idx, key, value) => {
+    setPaymentDraft((prev) => ({
+      ...prev,
+      issueLines: prev.issueLines.map((line, lineIdx) => (lineIdx === idx ? { ...line, [key]: value } : line)),
+    }));
+  };
+
+  const updatePartLine = (idx, key, value) => {
+    setPaymentDraft((prev) => ({
+      ...prev,
+      partLines: prev.partLines.map((line, lineIdx) => (lineIdx === idx ? { ...line, [key]: value } : line)),
+    }));
+  };
+
+  const addIssueLine = () => {
+    setPaymentDraft((prev) => ({ ...prev, issueLines: [...prev.issueLines, createIssueLine("", 0)] }));
+  };
+
+  const addPartLine = () => {
+    setPaymentDraft((prev) => ({ ...prev, partLines: [...prev.partLines, createPartLine("", 1, 0)] }));
+  };
+
+  const removeIssueLine = (idx) => {
+    setPaymentDraft((prev) => ({ ...prev, issueLines: prev.issueLines.filter((_, lineIdx) => lineIdx !== idx) }));
+  };
+
+  const removePartLine = (idx) => {
+    setPaymentDraft((prev) => ({ ...prev, partLines: prev.partLines.filter((_, lineIdx) => lineIdx !== idx) }));
+  };
+
+  const issueTotal = paymentDraft.issueLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+  const partsTotal = paymentDraft.partLines.reduce(
+    (sum, line) => sum + Number(line.qty || 0) * Number(line.unitPrice || 0),
+    0
+  );
+  const grandTotal = Math.max(
+    0,
+    issueTotal + partsTotal + Number(paymentDraft.doorstepCharge || 0) + Number(paymentDraft.tax || 0) - Number(paymentDraft.discount || 0)
+  );
+
+  const handleGeneratePayment = async () => {
+    if (!selectedTask?.id) return;
+    setPaymentLoading(true);
+    try {
+      const saved = await staffGenerateBookingPayment(selectedTask.id, {
+        invoiceNo: paymentDraft.invoiceNo,
+        laborCharge: issueTotal,
+        partsCharge: partsTotal,
+        doorstepCharge: Number(paymentDraft.doorstepCharge || 0),
+        discount: Number(paymentDraft.discount || 0),
+        tax: Number(paymentDraft.tax || 0),
+        notes: paymentDraft.notes || "",
+        issueLines: paymentDraft.issueLines,
+        partLines: paymentDraft.partLines,
+      });
+
+      setSelectedTask(prev => ({ ...prev, payment: saved }));
+      setTasks(prev => prev.map(t => (t.id === selectedTask.id ? { ...t, payment: saved } : t)));
+      window.alert("Payment generated successfully. User can now make payment.");
+    } catch (err) {
+      window.alert(err.message || "Failed to generate payment");
+    } finally {
+      setPaymentLoading(false);
+    }
+  };
 
   return (
     <div className="min-h-screen" style={{ background: "linear-gradient(135deg, #030712 0%, #0A1028 50%, #0C1230 100%)" }}>
@@ -262,6 +399,20 @@ const StaffDashboard = () => {
                       )}
                     </div>
 
+                    {/* Brief Issue Summary */}
+                    <div className="mb-4">
+                      {task.issueCategories?.length > 0 ? (
+                        <div className="flex flex-wrap gap-1 mb-2">
+                          {task.issueCategories.map((c, i) => (
+                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-md bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                              {c}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      <p className="text-sm text-slate-400 italic line-clamp-2">"{task.issue}"</p>
+                    </div>
+
                     {/* Location + Navigate */}
                     {task.pickupLocation?.lat && (
                       <a
@@ -292,6 +443,14 @@ const StaffDashboard = () => {
                       <div className="flex items-center gap-2 py-3 rounded-xl justify-center text-sm font-semibold"
                         style={{ background: "rgba(16,185,129,0.08)", color: "#6EE7B7", border: "1px solid rgba(16,185,129,0.15)" }}>
                         <Icon path={ICONS.check} className="w-4 h-4" /> Service Completed
+                      </div>
+                    )}
+
+                    {task.status === "Completed" && task.payment && (
+                      <div className="mt-3 flex items-center justify-between rounded-xl px-3 py-2"
+                        style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)" }}>
+                        <span className="text-xs font-semibold" style={{ color: "#93C5FD" }}>Payment: {task.payment.status || "Pending"}</span>
+                        <span className="text-xs font-bold" style={{ color: "#6EE7B7" }}>Rs {Number(task.payment.totalAmount || 0).toFixed(2)}</span>
                       </div>
                     )}
                   </div>
@@ -377,6 +536,15 @@ const StaffDashboard = () => {
                 <div className="rounded-xl p-4" style={{
                   background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.06)"
                 }}>
+                  {selectedTask.issueCategories && selectedTask.issueCategories.length > 0 && (
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {selectedTask.issueCategories.map((c, i) => (
+                        <span key={i} className="text-xs px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <p className="text-sm text-slate-300 italic">"{selectedTask.issue}"</p>
                 </div>
               </div>
@@ -389,6 +557,162 @@ const StaffDashboard = () => {
                   style={{ background: "linear-gradient(135deg, #059669, #10B981)" }}>
                   <Icon path={ICONS.mapPin} className="w-4 h-4" /> Open Navigation
                 </a>
+              )}
+
+              {selectedTask.status === "Completed" && (
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#6B7280" }}>Payment Calculator</div>
+                  <div className="rounded-xl p-4 space-y-3" style={{
+                    background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)"
+                  }}>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Invoice No</div>
+                        <input
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                          placeholder="Invoice No"
+                          value={paymentDraft.invoiceNo}
+                          onChange={(e) => setPaymentDraft(prev => ({ ...prev, invoiceNo: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Doorstep Amount</div>
+                        <input
+                          type="number"
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                          placeholder="Doorstep Amount"
+                          value={paymentDraft.doorstepCharge}
+                          onChange={(e) => setPaymentDraft(prev => ({ ...prev, doorstepCharge: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Discount</div>
+                        <input
+                          type="number"
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                          placeholder="Discount"
+                          value={paymentDraft.discount}
+                          onChange={(e) => setPaymentDraft(prev => ({ ...prev, discount: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Tax</div>
+                        <input
+                          type="number"
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                          placeholder="Tax"
+                          value={paymentDraft.tax}
+                          onChange={(e) => setPaymentDraft(prev => ({ ...prev, tax: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#93C5FD" }}>Issue Charges</div>
+                        <button
+                          onClick={addIssueLine}
+                          className="px-2 py-1 rounded text-[11px] font-semibold text-white"
+                          style={{ background: "rgba(59,130,246,0.35)" }}>
+                          + Add Issue
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {paymentDraft.issueLines.map((line, idx) => (
+                          <div key={`issue-${idx}`} className="grid grid-cols-[1fr_120px_34px] gap-2">
+                            <input
+                              className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                              placeholder="Issue name"
+                              value={line.name}
+                              onChange={(e) => updateIssueLine(idx, "name", e.target.value)}
+                            />
+                            <input
+                              type="number"
+                              className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                              placeholder="Amount"
+                              value={line.amount}
+                              onChange={(e) => updateIssueLine(idx, "amount", e.target.value)}
+                            />
+                            <button
+                              onClick={() => removeIssueLine(idx)}
+                              className="rounded-lg text-xs font-bold text-red-300 border border-red-400/30 bg-red-500/10">
+                              x
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-[11px] font-semibold uppercase tracking-wider" style={{ color: "#93C5FD" }}>Parts Added</div>
+                        <button
+                          onClick={addPartLine}
+                          className="px-2 py-1 rounded text-[11px] font-semibold text-white"
+                          style={{ background: "rgba(16,185,129,0.35)" }}>
+                          + Add Part
+                        </button>
+                      </div>
+                      <div className="space-y-2">
+                        {paymentDraft.partLines.map((line, idx) => (
+                          <div key={`part-${idx}`} className="grid grid-cols-[1fr_70px_100px_34px] gap-2">
+                            <input
+                              className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                              placeholder="Part name"
+                              value={line.name}
+                              onChange={(e) => updatePartLine(idx, "name", e.target.value)}
+                            />
+                            <input
+                              type="number"
+                              className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                              placeholder="Qty"
+                              value={line.qty}
+                              onChange={(e) => updatePartLine(idx, "qty", e.target.value)}
+                            />
+                            <input
+                              type="number"
+                              className="px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                              placeholder="Unit price"
+                              value={line.unitPrice}
+                              onChange={(e) => updatePartLine(idx, "unitPrice", e.target.value)}
+                            />
+                            <button
+                              onClick={() => removePartLine(idx)}
+                              className="rounded-lg text-xs font-bold text-red-300 border border-red-400/30 bg-red-500/10">
+                              x
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <textarea
+                      className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white min-h-[64px]"
+                      placeholder="Service notes for invoice"
+                      value={paymentDraft.notes}
+                      onChange={(e) => setPaymentDraft(prev => ({ ...prev, notes: e.target.value }))}
+                    />
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm font-semibold" style={{ color: "#93C5FD" }}>
+                        <div>Issue Total: Rs {issueTotal.toFixed(2)}</div>
+                        <div>Parts Total: Rs {partsTotal.toFixed(2)}</div>
+                        <div>Doorstep Amount: Rs {Number(paymentDraft.doorstepCharge || 0).toFixed(2)}</div>
+                        <div>Total: Rs {grandTotal.toFixed(2)}</div>
+                      </div>
+                      <button
+                        onClick={handleGeneratePayment}
+                        disabled={paymentLoading}
+                        className="px-4 py-2 rounded-lg text-xs font-bold text-white disabled:opacity-50"
+                        style={{ background: "linear-gradient(135deg, #2563EB, #3B82F6)" }}>
+                        {paymentLoading ? "Generating..." : "Generate Payment"}
+                      </button>
+                    </div>
+                    {selectedTask.payment?.status === "Paid" && (
+                      <div className="text-xs font-semibold" style={{ color: "#6EE7B7" }}>
+                        Payment already paid by user.
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>

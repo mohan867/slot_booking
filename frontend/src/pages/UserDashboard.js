@@ -3,18 +3,25 @@ import {
   logoutUser, 
   getCurrentUserProfile, 
   listenUserBookings,
+  listenNotificationsForCurrentUser,
+  markNotificationSeen,
+  generateBookingPayment,
+  makeBookingPayment,
   getAvailableSlots,
   createBooking,
   cancelBooking,
-  rescheduleBooking
+  rescheduleBooking,
+  createReminder
 } from "../services/firebaseService";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import DashboardTab from '../components/UserDashboard/DashboardTab';
 import BookServiceTab from '../components/UserDashboard/BookServiceTab';
 import MyBookingsTab from '../components/UserDashboard/MyBookingsTab';
+import PaymentsTab from '../components/UserDashboard/PaymentsTab';
 import StatusTab from '../components/UserDashboard/StatusTab';
 import RemindersTab from '../components/UserDashboard/RemindersTab';
+import ReminderModal from '../components/UserDashboard/ReminderModal';
 import FeedbackTab from '../components/UserDashboard/FeedbackTab';
 
 
@@ -76,6 +83,7 @@ const ICONS = {
   info: "M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
   lightning: "M13 10V3L4 14h7v7l9-11h-7z",
   star: "M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.518 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.973 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.921-.755 1.688-1.538 1.118l-3.973-2.888a1 1 0 00-1.175 0l-3.973 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.973-2.888c-.783-.57-.38-1.81.588-1.81h4.915a1 1 0 00.95-.69l1.518-4.674z",
+  receipt: "M9 14h6m-6-4h6m-7 9h8a2 2 0 002-2V5a2 2 0 00-2-2h-1.5a1 1 0 01-.707-.293l-.586-.586A1 1 0 0012.5 2h-1a1 1 0 00-.707.293l-.586.586A1 1 0 019.5 3H8a2 2 0 00-2 2v12a2 2 0 002 2z",
 };
 
 const ISSUE_CATEGORIES = ["Oil Change", "Brake Service", "Engine Problem", "Tire Replacement", "Battery Issue", "General Checkup"];
@@ -84,14 +92,18 @@ const getStatusBadge = (status, dark = true) => {
   if (dark) {
     const map = {
       Pending: "badge-pending", Accepted: "badge-accepted", Rejected: "badge-rejected",
-      Assigned: "badge-assigned", "In Progress": "badge-inprogress", Completed: "badge-completed"
+      Assigned: "badge-assigned", "In Progress": "badge-inprogress", Completed: "badge-completed",
+      "On Hold": "badge-rejected"
     };
+    if (status === "On Hold") return "bg-orange-500/10 text-orange-400 border border-orange-500/20 px-2 py-1 rounded text-xs font-semibold";
     return map[status] || "badge-pending";
   }
   const map = {
     Pending: "badge-pending-light", Accepted: "badge-accepted-light", Rejected: "badge-rejected-light",
-    Assigned: "badge-assigned-light", "In Progress": "badge-inprogress-light", Completed: "badge-completed-light"
+    Assigned: "badge-assigned-light", "In Progress": "badge-inprogress-light", Completed: "badge-completed-light",
+    "On Hold": "badge-rejected-light"
   };
+  if (status === "On Hold") return "bg-orange-50 text-orange-600 border border-orange-200 px-2 py-1 rounded text-xs font-semibold";
   return map[status] || "badge-pending-light";
 };
 
@@ -101,6 +113,7 @@ const Sidebar = ({ activeTab, setActiveTab, handleLogout, dark, userData, sideba
     { id: "dashboard", label: "Dashboard", icon: ICONS.dashboard },
     { id: "book", label: "Book Service", icon: ICONS.book },
     { id: "bookings", label: "My Bookings", icon: ICONS.bookings },
+    { id: "payments", label: "Payments", icon: ICONS.receipt },
     { id: "status", label: "Service Status", icon: ICONS.status },
     { id: "reminders", label: "Reminders", icon: ICONS.bell },
     { id: "feedback", label: "Feedback", icon: ICONS.star },
@@ -224,6 +237,7 @@ const UserDashboard = () => {
   const [availableSlots, setAvailableSlots] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState({ text: "", type: "" });
+  const [paymentLoadingId, setPaymentLoadingId] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
   const [userData, setUserData] = useState(null);
   const [dark, setDark] = useState(true);
@@ -235,6 +249,7 @@ const UserDashboard = () => {
   });
 
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, booking: null, newDate: "", newTime: "" });
+  const [reminderModal, setReminderModal] = useState({ isOpen: false, bookingId: null, vehicleNumber: "" });
 
   /* ── Map state ── */
   const mapContainerRef = useRef(null);
@@ -244,6 +259,7 @@ const UserDashboard = () => {
   const shopMarkerRef = useRef(null);
   const [mapReady, setMapReady] = useState(false);
   const [locatingUser, setLocatingUser] = useState(false);
+  const notificationsReadyRef = useRef(false);
 
   /* ── Reverse geocode ── */
   const reverseGeocode = useCallback(async (lat, lng) => {
@@ -371,6 +387,26 @@ const UserDashboard = () => {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = listenNotificationsForCurrentUser(async (items) => {
+      if (!notificationsReadyRef.current) {
+        notificationsReadyRef.current = true;
+        return;
+      }
+
+      const nextUnread = items.find((n) => !n.seen);
+      if (!nextUnread) return;
+
+      showMessage(nextUnread.message || "Service update received", "success");
+      window.alert(nextUnread.message || "Service update received");
+      try {
+        await markNotificationSeen(nextUnread.id || nextUnread._id);
+      } catch { }
+    }, "user");
+
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => { 
     if (formData.serviceDate) fetchAvailableSlots(formData.serviceDate); 
   }, [formData.serviceDate]);
@@ -476,6 +512,44 @@ const UserDashboard = () => {
     } finally { setLoading(false); }
   };
 
+  const handleGeneratePayment = async (bookingId) => {
+    setPaymentLoadingId(bookingId);
+    try {
+      await generateBookingPayment(bookingId);
+      showMessage("Payment generated. You can now review details and make payment.", "success");
+    } catch (err) {
+      showMessage(err.message || "Failed to generate payment", "error");
+    } finally {
+      setPaymentLoadingId("");
+    }
+  };
+
+  const handleMakePayment = async (bookingId) => {
+    if (!window.confirm("Confirm payment for this booking?")) return;
+    setPaymentLoadingId(bookingId);
+    try {
+      await makeBookingPayment(bookingId);
+      showMessage("Payment completed successfully!", "success");
+    } catch (err) {
+      showMessage(err.message || "Payment failed", "error");
+    } finally {
+      setPaymentLoadingId("");
+    }
+  };
+
+  const handleSaveReminder = async ({ title, date, note, bookingId }) => {
+    try {
+      await createReminder({ title, date, note, bookingId });
+      showMessage("Reminder set successfully!", "success");
+    } catch (err) {
+      showMessage(err.message || "Failed to set reminder", "error");
+    }
+  };
+
+  const openReminderModal = (bookingId, vehicleNumber) => {
+    setReminderModal({ isOpen: true, bookingId, vehicleNumber });
+  };
+
   const handleLogout = async () => {
     try { await logoutUser(); } catch { }
     window.location.reload();
@@ -494,6 +568,7 @@ const UserDashboard = () => {
     assigned: bookings.filter(b => b.status === "Assigned").length,
     inProgress: bookings.filter(b => b.status === "In Progress").length,
     completed: bookings.filter(b => b.status === "Completed").length,
+    onHold: bookings.filter(b => b.status === "On Hold").length,
   };
 
   /* ── Styles ── */
@@ -511,7 +586,9 @@ const UserDashboard = () => {
     formData, handleInputChange, handleCheckboxChange, availableSlots, handleSlotSelect,
     handleSubmit, loading, setFormData, handleUseMyLocation, locatingUser,
     mapContainerRef, SHOP_LOCATION, ISSUE_CATEGORIES, getMinDate, inputClass, labelClass,
-    handleCancelBooking, setRescheduleModal, activeTab
+    handleCancelBooking, setRescheduleModal, activeTab,
+    paymentLoadingId, handleGeneratePayment, handleMakePayment,
+    openReminderModal
   };
 
   return (
@@ -611,6 +688,10 @@ const UserDashboard = () => {
 
           <MyBookingsTab {...commonProps} />
 
+          {/* ═══════════════ PAYMENTS TAB ═══════════════ */}
+
+          <PaymentsTab {...commonProps} />
+
 
           {/* ═══════════════ STATUS TAB ═══════════════ */}
 
@@ -667,6 +748,16 @@ const UserDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* ── Reminder Modal ── */}
+      <ReminderModal
+        isOpen={reminderModal.isOpen}
+        onClose={() => setReminderModal({ isOpen: false, bookingId: null, vehicleNumber: "" })}
+        onSave={handleSaveReminder}
+        ICONS={ICONS}
+        bookingId={reminderModal.bookingId}
+        vehicleNumber={reminderModal.vehicleNumber}
+      />
     </div>
   );
 };

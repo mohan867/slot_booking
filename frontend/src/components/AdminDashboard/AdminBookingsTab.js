@@ -30,6 +30,7 @@ const AdminBookingsTab = (props) => {
                   { label: "Assigned", count: stats.assigned, grad: "linear-gradient(135deg,#1E40AF,#3B82F6)" },
                   { label: "In Progress", count: stats.inProgress, grad: "linear-gradient(135deg,#7C3AED,#A78BFA)" },
                   { label: "Completed", count: stats.completed, grad: "linear-gradient(135deg,#047857,#34D399)" },
+                  { label: "On Hold", count: stats.onHold, grad: "linear-gradient(135deg,#B45309,#F59E0B)" },
                   { label: "Rejected", count: stats.rejected, grad: "linear-gradient(135deg,#7F1D1D,#F87171)" },
                 ].map(f => (
                   <button key={f.label}
@@ -74,7 +75,7 @@ const AdminBookingsTab = (props) => {
                       </thead>
                       <tbody>
                         {filteredBookings.map((b, idx) => (
-                          <tr key={b.id} onClick={() => setSelectedBooking(b)}
+                          <tr key={b.id} onClick={() => { setActiveTab('bookings'); setSelectedBooking(b); }}
                             className="cursor-pointer" style={{ transition: 'background 0.15s' }}>
                             <td className="font-mono text-xs" style={{ color: '#3d4a5c' }}>
                               #{(idx + 1).toString().padStart(3, "0")}
@@ -134,7 +135,11 @@ const AdminBookingsTab = (props) => {
                             </td>
                             <td className="text-right">
                               <button
-                                onClick={(e) => { e.stopPropagation(); setSelectedBooking(b); }}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setActiveTab('bookings');
+                                  setSelectedBooking(b);
+                                }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ml-auto"
                                 style={{
                                   background: 'rgba(34,197,94,0.08)',

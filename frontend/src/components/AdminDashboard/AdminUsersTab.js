@@ -6,23 +6,66 @@ const AdminUsersTab = (props) => {
 
   if (activeTab !== "users") return null;
 
+  const getUserKey = (u) => u?.id || u?.uid || u?._id || "";
+
+  const registeredCustomerMap = (users || []).reduce((acc, u) => {
+    const key = getUserKey(u);
+    if (!key) return acc;
+    const role = String(u?.role || "user").toLowerCase();
+    if (role === "admin" || role === "staff") return acc;
+    acc[key] = { ...u, id: key };
+    return acc;
+  }, {});
+
+  const bookedCustomerMap = (bookings || []).reduce((acc, b) => {
+    const uid = b?.userId?._id || b?.userId?.id || b?.userId?.uid || "";
+    if (!uid) return acc;
+
+    const fromUsers = registeredCustomerMap[uid];
+    acc[uid] = {
+      id: uid,
+      uid,
+      name: fromUsers?.name || b?.userId?.name || "User",
+      email: fromUsers?.email || b?.userId?.email || "-",
+      role: "user",
+      createdAt: fromUsers?.createdAt || b?.createdAt || null,
+    };
+    return acc;
+  }, {});
+
+  const customerUsers = Object.values(bookedCustomerMap);
+
   return (
     <div className="page-transition">
-      <div className="mb-6">
-        <h2 className="text-xl font-bold" style={{ color: '#c4d4e4' }}>User Management</h2>
-        <p className="text-sm" style={{ color: '#5a6a7a' }}>{users.length} registered users</p>
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-xl font-bold" style={{ color: '#c4d4e4' }}>User Management</h2>
+          <p className="text-sm" style={{ color: '#5a6a7a' }}>{customerUsers.length} customers with bookings</p>
+        </div>
+        <button
+          onClick={() => setActiveTab('bookings')}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all"
+          style={{ background: 'linear-gradient(135deg, #1E40AF, #3B82F6)', boxShadow: '0 4px 16px rgba(59,130,246,0.25)' }}
+        >
+          <Icon path={ICONS.bookings} className="w-4 h-4" />
+          Manage Bookings
+        </button>
       </div>
 
-      {users.length === 0 ? (
+      {customerUsers.length === 0 ? (
         <div className={`${cardClass} p-16 text-center`}>
           <Icon path={ICONS.users} className="w-12 h-12 mx-auto mb-3" style={{ color: '#1a2432' }} />
-          <p style={{ color: '#5a6a7a' }}>No users found</p>
+          <p style={{ color: '#5a6a7a' }}>No customer bookings found</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {users.map(u => {
+          {customerUsers.map(u => {
             if (!u) return null;
-            const userBookings = bookings.filter(b => b.userId === u.id || b.userId?._id === u.id);
+            const uid = getUserKey(u);
+            const userBookings = bookings.filter((b) => {
+              const bookingUid = b?.userId?._id || b?.userId?.id || b?.userId?.uid || "";
+              return bookingUid === uid;
+            });
             return (
               <div key={u.id} className={`${cardClass} p-5 cursor-pointer glow-card-green`}
                 onClick={() => setSelectedUser(u)}

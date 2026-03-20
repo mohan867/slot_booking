@@ -2,7 +2,24 @@ import React from 'react';
 import { Icon } from './Shared';
 
 const MyBookingsTab = (props) => {
-  const { dark, textPrimary, textSecondary, ICONS, cardClass, badgeFn, bookings, setActiveTab, handleCancelBooking, setRescheduleModal, activeTab, SHOP_LOCATION } = props;
+  const {
+    dark,
+    textPrimary,
+    textSecondary,
+    ICONS,
+    cardClass,
+    badgeFn,
+    bookings,
+    setActiveTab,
+    handleCancelBooking,
+    setRescheduleModal,
+    activeTab,
+    SHOP_LOCATION,
+    paymentLoadingId,
+    handleGeneratePayment,
+    handleMakePayment,
+    openReminderModal,
+  } = props;
 
   return (
     <>
@@ -137,6 +154,72 @@ const MyBookingsTab = (props) => {
                           style={{ background: 'rgba(16,185,129,0.08)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.15)' }}>
                           <Icon path={ICONS.check} className="w-3.5 h-3.5" /> Service Completed
                         </div>
+                      )}
+
+                      {b.status === "Completed" && (
+                        <div className="rounded-xl p-3 mb-3"
+                          style={{ background: '#0F1520', border: '1px solid rgba(59,130,246,0.18)' }}>
+                          <div className="text-xs font-semibold mb-2" style={{ color: '#93C5FD' }}>Payment Details</div>
+                          {!b.payment ? (
+                            <button
+                              onClick={() => handleGeneratePayment(b.id)}
+                              disabled={paymentLoadingId === b.id}
+                              className="w-full py-2.5 rounded-xl text-xs font-semibold transition-all"
+                              style={{
+                                background: 'linear-gradient(135deg, #1D4ED8, #3B82F6)',
+                                color: '#fff',
+                                opacity: paymentLoadingId === b.id ? 0.6 : 1,
+                              }}
+                            >
+                              {paymentLoadingId === b.id ? 'Generating...' : 'Generate Payment'}
+                            </button>
+                          ) : (
+                            <>
+                              <div className="space-y-1 text-xs mb-3" style={{ color: '#AFC7E5' }}>
+                                <div>Invoice: <span className="font-semibold text-white">{b.payment.invoiceNo || '-'}</span></div>
+                                <div>Total: <span className="font-semibold text-emerald-400">Rs {Number(b.payment.totalAmount || 0).toFixed(2)}</span></div>
+                                <div>Status: <span className={`font-semibold ${b.payment.status === 'Paid' ? 'text-emerald-400' : 'text-amber-400'}`}>{b.payment.status || 'Pending'}</span></div>
+                              </div>
+                              {b.payment.status !== 'Paid' ? (
+                                <button
+                                  onClick={() => handleMakePayment(b.id)}
+                                  disabled={paymentLoadingId === b.id}
+                                  className="w-full py-2.5 rounded-xl text-xs font-semibold transition-all"
+                                  style={{
+                                    background: 'linear-gradient(135deg, #047857, #10B981)',
+                                    color: '#fff',
+                                    opacity: paymentLoadingId === b.id ? 0.6 : 1,
+                                  }}
+                                >
+                                  {paymentLoadingId === b.id ? 'Processing...' : 'Make Payment'}
+                                </button>
+                              ) : (
+                                <div className="w-full py-2.5 rounded-xl text-center text-xs font-semibold"
+                                  style={{ background: 'rgba(16,185,129,0.12)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                  Payment Completed
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Set Reminder Button */}
+                      {b.status === "Completed" && (
+                        <button
+                          onClick={() => openReminderModal(b.id, b.vehicleNumber)}
+                          className="w-full py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-2 mt-3"
+                          style={{
+                            background: 'rgba(251,191,36,0.08)',
+                            border: '1px solid rgba(251,191,36,0.2)',
+                            color: '#FBBF24',
+                          }}
+                          onMouseEnter={(e) => e.target.style.background = 'rgba(251,191,36,0.15)'}
+                          onMouseLeave={(e) => e.target.style.background = 'rgba(251,191,36,0.08)'}
+                        >
+                          <Icon path={ICONS.bell} className="w-4 h-4" />
+                          Set Service Reminder
+                        </button>
                       )}
 
                       {/* Actions */}

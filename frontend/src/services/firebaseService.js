@@ -30,6 +30,31 @@ import { auth, db } from "../firebase";
 ───────────────────────────────────────────── */
 const uid = () => push(ref(db, "_tmp")).key;
 
+const createNotification = async ({
+  recipientUid = null,
+  recipientRole = null,
+  type = "info",
+  title,
+  message,
+  bookingId = null,
+}) => {
+  const newRef = push(ref(db, "notifications"));
+  const payload = {
+    id: newRef.key,
+    _id: newRef.key,
+    recipientUid,
+    recipientRole,
+    type,
+    title,
+    message,
+    bookingId,
+    seen: false,
+    createdAt: new Date().toISOString(),
+  };
+  await set(newRef, payload);
+  return payload;
+};
+
 /* ─────────────────────────────────────────────
    AUTH SERVICES
 ───────────────────────────────────────────── */
@@ -260,6 +285,216 @@ export const assignStaffToBooking = async (bookingId, staffId) => {
   });
 };
 
+/** Generate payment draft for completed booking (user) */
+export const generateBookingPayment = async (bookingId) => {
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  const snap = await get(bookingRef);
+  if (!snap.exists()) throw new Error("Booking not found");
+
+  const booking = snap.val();
+  if (booking.status !== "Completed") {
+    throw new Error("Payment can only be generated after service completion");
+  }
+
+  const laborCharge = Number(booking.payment?.laborCharge ?? 500);
+  const partsCharge = Number(booking.payment?.partsCharge ?? 0);
+  const doorstepCharge = Number(booking.doorstepCharge || 0);
+  const discount = Number(booking.payment?.discount ?? 0);
+  const tax = Number(booking.payment?.tax ?? 0);
+  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tax - discount);
+
+  const payment = {
+    invoiceNo: booking.payment?.invoiceNo || `INV-${Date.now()}`,
+    laborCharge,
+    partsCharge,
+    doorstepCharge,
+    discount,
+    tax,
+    totalAmount,
+    notes: booking.payment?.notes || "",
+    status: booking.payment?.status || "Pending",
+    generatedAt: booking.payment?.generatedAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  await update(bookingRef, { payment, updatedAt: new Date().toISOString() });
+
+  const adminNotice = createNotification({
+    recipientRole: "admin",
+    type: "payment-generated",
+    title: "Payment Generated",
+    message: `Payment draft generated for ${booking.vehicleNumber || "a completed booking"}.`,
+    bookingId,
+  });
+
+  const userNotice = createNotification({
+    recipientUid: booking.userId?._id || booking.userId?.id || null,
+    type: "payment-generated",
+    title: "Payment Ready",
+    message: `Payment details are ready for ${booking.vehicleNumber || "your booking"}.`,
+    bookingId,
+  });
+
+  await Promise.all([adminNotice, userNotice]);
+  return payment;
+};
+
+/** Admin edit/update booking payment */
+export const updateBookingPayment = async (bookingId, paymentInput) => {
+  const laborCharge = Number(paymentInput.laborCharge || 0);
+  const partsCharge = Number(paymentInput.partsCharge || 0);
+  const doorstepCharge = Number(paymentInput.doorstepCharge || 0);
+  const discount = Number(paymentInput.discount || 0);
+  const tax = Number(paymentInput.tax || 0);
+  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tax - discount);
+
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  const snap = await get(bookingRef);
+  if (!snap.exists()) throw new Error("Booking not found");
+
+  const prevPayment = snap.val().payment || {};
+  const payment = {
+    invoiceNo: paymentInput.invoiceNo || prevPayment.invoiceNo || `INV-${Date.now()}`,
+    laborCharge,
+    partsCharge,
+    doorstepCharge,
+    discount,
+    tax,
+    totalAmount,
+    notes: paymentInput.notes || "",
+    status: prevPayment.status || "Pending",
+    generatedAt: prevPayment.generatedAt || new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+    paidAt: prevPayment.paidAt || null,
+    paidByUid: prevPayment.paidByUid || null,
+    paymentMethod: prevPayment.paymentMethod || null,
+  };
+
+  await update(bookingRef, { payment, updatedAt: new Date().toISOString() });
+  return payment;
+};
+
+/** Staff calculates and generates payment for completed service */
+export const staffGenerateBookingPayment = async (bookingId, paymentInput) => {
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  const snap = await get(bookingRef);
+  if (!snap.exists()) throw new Error("Booking not found");
+
+  const booking = snap.val();
+  if (booking.status !== "Completed") {
+    throw new Error("Complete the service before generating payment");
+  }
+
+  const issueLines = Array.isArray(paymentInput.issueLines)
+    ? paymentInput.issueLines.map((line) => ({
+        name: line.name || "Service Item",
+        amount: Number(line.amount || 0),
+      }))
+    : [];
+
+  const partLines = Array.isArray(paymentInput.partLines)
+    ? paymentInput.partLines.map((line) => ({
+        name: line.name || "Part",
+        qty: Number(line.qty || 1),
+        unitPrice: Number(line.unitPrice || 0),
+        amount: Number(line.qty || 1) * Number(line.unitPrice || 0),
+      }))
+    : [];
+
+  const issueTotal = issueLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+  const partsTotal = partLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+
+  const laborCharge = issueLines.length > 0 ? issueTotal : Number(paymentInput.laborCharge || 0);
+  const partsCharge = partLines.length > 0 ? partsTotal : Number(paymentInput.partsCharge || 0);
+  const doorstepCharge = Number(paymentInput.doorstepCharge || 0);
+  const discount = Number(paymentInput.discount || 0);
+  const tax = Number(paymentInput.tax || 0);
+  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tax - discount);
+
+  const prevPayment = booking.payment || {};
+  const payment = {
+    invoiceNo: paymentInput.invoiceNo || prevPayment.invoiceNo || `INV-${Date.now()}`,
+    laborCharge,
+    partsCharge,
+    doorstepCharge,
+    discount,
+    tax,
+    totalAmount,
+    notes: paymentInput.notes || "",
+    issueLines,
+    partLines,
+    status: prevPayment.status === "Paid" ? "Paid" : "Pending",
+    generatedAt: prevPayment.generatedAt || new Date().toISOString(),
+    generatedBy: "staff",
+    generatedByUid: auth.currentUser?.uid || null,
+    updatedAt: new Date().toISOString(),
+    paidAt: prevPayment.paidAt || null,
+    paidByUid: prevPayment.paidByUid || null,
+    paymentMethod: prevPayment.paymentMethod || null,
+  };
+
+  await update(bookingRef, {
+    payment,
+    updatedAt: new Date().toISOString(),
+  });
+
+  const customerUid = booking.userId?._id || booking.userId?.id || null;
+  await Promise.all([
+    createNotification({
+      recipientRole: "admin",
+      type: "payment-generated",
+      title: "Payment Generated By Staff",
+      message: `Staff generated payment for ${booking.vehicleNumber || "a booking"}.`,
+      bookingId,
+    }),
+    customerUid
+      ? createNotification({
+          recipientUid: customerUid,
+          type: "payment-generated",
+          title: "Payment Ready",
+          message: `Your payment for ${booking.vehicleNumber || "booking"} is ready. Please make payment.`,
+          bookingId,
+        })
+      : null,
+  ].filter(Boolean));
+
+  return payment;
+};
+
+/** User completes payment */
+export const makeBookingPayment = async (bookingId) => {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  const snap = await get(bookingRef);
+  if (!snap.exists()) throw new Error("Booking not found");
+
+  const booking = snap.val();
+  if (!booking.payment) throw new Error("Generate payment first");
+
+  const payment = {
+    ...booking.payment,
+    status: "Paid",
+    paidAt: new Date().toISOString(),
+    paidByUid: user.uid,
+    paymentMethod: "Online",
+    updatedAt: new Date().toISOString(),
+  };
+
+  await update(bookingRef, { payment, updatedAt: new Date().toISOString() });
+
+  await createNotification({
+    recipientRole: "admin",
+    type: "payment-paid",
+    title: "Payment Received",
+    message: `Payment marked as paid for ${booking.vehicleNumber || "a booking"}.`,
+    bookingId,
+  });
+
+  return payment;
+};
+
 /** Get available time slots for a date */
 export const getAvailableSlots = async (date) => {
   const allSlots = [
@@ -375,6 +610,17 @@ export const deleteStaff = async (uid) => {
   await update(ref(db, `users/${uid}`), { role: "user" });
 };
 
+/** Update staff status */
+export const updateStaffStatus = async (staffId, status) => {
+  await update(ref(db, `staff/${staffId}`), { status });
+  await updateUserStatus(staffId, status);
+};
+
+/** Update user status */
+export const updateUserStatus = async (uid, status) => {
+  await update(ref(db, `users/${uid}`), { status });
+};
+
 /** Get available staff (those with fewest assignments) */
 export const getAvailableStaff = async () => {
   const snap = await get(ref(db, "staff"));
@@ -402,9 +648,89 @@ export const getStaffBookings = async () => {
 
 /** Update booking progress (staff) */
 export const updateBookingProgress = async (bookingId, status) => {
-  await update(ref(db, `bookings/${bookingId}`), {
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  await update(bookingRef, {
     status,
     updatedAt: new Date().toISOString(),
+  });
+
+  if (status !== "In Progress") return;
+
+  const bookingSnap = await get(bookingRef);
+  if (!bookingSnap.exists()) return;
+
+  const booking = bookingSnap.val();
+  const staffProfile = await getCurrentUserProfile();
+  const staffName = staffProfile?.name || auth.currentUser?.displayName || "Technician";
+  const vehicleLabel = booking.vehicleNumber || "vehicle";
+  const customerUid = booking.userId?._id || booking.userId?.id || null;
+  const staffUid = auth.currentUser?.uid || null;
+
+  const writes = [
+    customerUid
+      ? createNotification({
+          recipientUid: customerUid,
+          type: "service-started",
+          title: "Service Started",
+          message: `Your service for ${vehicleLabel} is now in progress. ${staffName} has started the work.`,
+          bookingId,
+        })
+      : null,
+    createNotification({
+      recipientRole: "admin",
+      type: "service-started",
+      title: "Staff Started Service",
+      message: `${staffName} started service for ${vehicleLabel}.`,
+      bookingId,
+    }),
+    staffUid
+      ? createNotification({
+          recipientUid: staffUid,
+          type: "service-started",
+          title: "Service Started",
+          message: `You started service for ${vehicleLabel}. User and admin were notified.`,
+          bookingId,
+        })
+      : null,
+  ].filter(Boolean);
+
+  await Promise.all(writes);
+};
+
+/* ─────────────────────────────────────────────
+   NOTIFICATIONS
+───────────────────────────────────────────── */
+
+export const listenNotificationsForCurrentUser = (callback, roleOverride = null) => {
+  const user = auth.currentUser;
+  if (!user) {
+    callback([]);
+    return () => {};
+  }
+
+  const notificationsRef = ref(db, "notifications");
+  onValue(notificationsRef, (snap) => {
+    if (!snap.exists()) {
+      callback([]);
+      return;
+    }
+
+    const all = Object.values(snap.val());
+    const mine = all
+      .filter((n) => n.recipientUid === user.uid || (roleOverride && n.recipientRole === roleOverride))
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+    callback(mine);
+  });
+
+  return () => off(notificationsRef);
+};
+
+export const markNotificationSeen = async (notificationId) => {
+  if (!notificationId) return;
+  await update(ref(db, `notifications/${notificationId}`), {
+    seen: true,
+    seenAt: new Date().toISOString(),
   });
 };
 
@@ -424,7 +750,7 @@ export const getUserReminders = async () => {
 };
 
 /** Create reminder */
-export const createReminder = async ({ title, date, note }) => {
+export const createReminder = async ({ title, date, note, bookingId }) => {
   const user = auth.currentUser;
   if (!user) throw new Error("Not authenticated");
   const newRef = push(ref(db, `reminders/${user.uid}`));
@@ -434,6 +760,7 @@ export const createReminder = async ({ title, date, note }) => {
     title,
     date,
     note: note || "",
+    bookingId: bookingId || null,
     done: false,
     createdAt: new Date().toISOString(),
   };
