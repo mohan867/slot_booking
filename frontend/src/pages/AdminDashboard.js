@@ -22,8 +22,8 @@ import AdminStaffTab from '../components/AdminDashboard/AdminStaffTab';
 import UserDetailModal from '../components/AdminDashboard/UserDetailModal';
 
 
-/* ── Shop Location (RMK Garage) ─── */
-const SHOP_LOCATION = { lat: 13.0827, lng: 80.2707, name: "RMK Garage" };
+/* ── Shop Location (Map Landmark) ─── */
+const SHOP_LOCATION = { lat: 11.2432461, lng: 77.5062681, name: "2/125, Vijayamangalam Rd, Vijayapuri" };
 
 /* ── Leaflet default icon fix ─── */
 delete L.Icon.Default.prototype._getIconUrl;
@@ -73,6 +73,7 @@ const getStatusBadge = (status, dark) => {
       Pending: "badge-pending",
       Accepted: "badge-accepted",
       Rejected: "badge-rejected",
+      "On Hold": "badge-rejected",
       Assigned: "badge-assigned",
       "In Progress": "badge-inprogress",
       Completed: "badge-completed"
@@ -191,6 +192,7 @@ const AdminDashboard = () => {
   /* ── Booking Tracking & Filtering ── */
   const [filterStatus, setFilterStatus] = useState("All");
   const [selectedBooking, setSelectedBooking] = useState(null);
+  const [selectedBookingReadOnly, setSelectedBookingReadOnly] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedTechnician, setSelectedTechnician] = useState("");
   const [paymentDraft, setPaymentDraft] = useState({
@@ -211,6 +213,7 @@ const AdminDashboard = () => {
   const routeLineRef = useRef(null);
   const shopMarkerRef = useRef(null);
   const notificationsReadyRef = useRef(false);
+  const prevAvailableCountRef = useRef(null);
 
   useEffect(() => {
     fetchProfile();
@@ -245,6 +248,23 @@ const AdminDashboard = () => {
 
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    const availableCount = staff.filter((s) => s.status === "Available").length;
+    const onHoldCount = bookings.filter((b) => b.status === "On Hold").length;
+
+    if (
+      prevAvailableCountRef.current !== null &&
+      prevAvailableCountRef.current === 0 &&
+      availableCount > 0 &&
+      onHoldCount > 0
+    ) {
+      showMessage("Now staff is available", "success");
+      window.alert("Now staff is available");
+    }
+
+    prevAvailableCountRef.current = availableCount;
+  }, [staff, bookings]);
 
   const fetchProfile = async () => {
     try {
@@ -284,11 +304,42 @@ const AdminDashboard = () => {
     });
   }, [selectedBooking]);
 
+  useEffect(() => {
+    setSelectedTechnician("");
+  }, [selectedBooking?.id]);
+
+  const handleConfirmBooking = async () => {
+    if (!selectedBooking?.id) return;
+    if (!selectedTechnician) {
+      showMessage("Please select a technician before confirming booking", "error");
+      return;
+    }
+    await handleAssignStaff(selectedBooking.id, selectedTechnician);
+    setSelectedTechnician("");
+  };
+
   const handleUpdateStatus = async (id, status) => {
+    if (["Assigned", "Accepted", "In Progress"].includes(selectedBooking?.status) && selectedBooking?.id === id) {
+      showMessage("Live working booking is view-only", "error");
+      return;
+    }
+    if (selectedBookingReadOnly && selectedBooking?.id === id) {
+      showMessage("Read-only view: changes are disabled", "error");
+      return;
+    }
+    const target = bookings.find((b) => b.id === id) || selectedBooking;
+    if (target?.status === "Completed") {
+      showMessage("Completed bookings are view-only", "error");
+      return;
+    }
     setLoading(true);
     try {
       await updateBookingStatus(id, status);
       showMessage(`Booking ${status.toLowerCase()}!`, "success");
+      if (status === "On Hold") {
+        setActiveTab("bookings");
+        setFilterStatus("On Hold");
+      }
       if (selectedBooking?.id === id) {
         setSelectedBooking(prev => ({ ...prev, status }));
       }
@@ -298,6 +349,19 @@ const AdminDashboard = () => {
   };
 
   const handleAssignStaff = async (bookingId, staffId) => {
+    if (["Assigned", "Accepted", "In Progress"].includes(selectedBooking?.status) && selectedBooking?.id === bookingId) {
+      showMessage("Live working booking is view-only", "error");
+      return;
+    }
+    if (selectedBookingReadOnly && selectedBooking?.id === bookingId) {
+      showMessage("Read-only view: changes are disabled", "error");
+      return;
+    }
+    const target = bookings.find((b) => b.id === bookingId) || selectedBooking;
+    if (target?.status === "Completed") {
+      showMessage("Completed bookings are view-only", "error");
+      return;
+    }
     setLoading(true);
     try {
       await assignStaffToBooking(bookingId, staffId);
@@ -308,6 +372,19 @@ const AdminDashboard = () => {
   };
 
   const handleDeleteBooking = async (id) => {
+    if (["Assigned", "Accepted", "In Progress"].includes(selectedBooking?.status) && selectedBooking?.id === id) {
+      showMessage("Live working booking cannot be deleted", "error");
+      return;
+    }
+    if (selectedBookingReadOnly && selectedBooking?.id === id) {
+      showMessage("Read-only view: delete is disabled", "error");
+      return;
+    }
+    const target = bookings.find((b) => b.id === id) || selectedBooking;
+    if (target?.status === "Completed") {
+      showMessage("Completed bookings cannot be deleted", "error");
+      return;
+    }
     if (!window.confirm("Permanently delete this booking?")) return;
     setLoading(true);
     try {
@@ -321,6 +398,14 @@ const AdminDashboard = () => {
 
   const handleSavePayment = async () => {
     if (!selectedBooking?.id) return;
+    if (selectedBookingReadOnly) {
+      showMessage("Read-only view: changes are disabled", "error");
+      return;
+    }
+    if (selectedBooking?.status === "Completed") {
+      showMessage("Completed booking is view-only", "error");
+      return;
+    }
     if (selectedBooking?.payment?.status === "Paid") {
       showMessage("Paid payments are view-only and cannot be edited", "error");
       return;
@@ -405,7 +490,10 @@ const AdminDashboard = () => {
   const cardClass = dark ? "card-dark" : "card-light";
   const inputClass = dark ? "input-dark" : "input-light";
   const badgeFn = (s) => getStatusBadge(s, dark);
-  const isPaymentEditable = selectedBooking?.payment?.status !== "Paid";
+  const isCompletedReadOnly = selectedBooking?.status === "Completed";
+  const isLiveWorkingReadOnly = ["Assigned", "Accepted", "In Progress"].includes(selectedBooking?.status);
+  const isModalReadOnly = isCompletedReadOnly || isLiveWorkingReadOnly || selectedBookingReadOnly;
+  const isPaymentEditable = false;
   const selectedPayment = selectedBooking?.payment || {};
   const selectedIssueLines = Array.isArray(selectedPayment.issueLines) ? selectedPayment.issueLines : [];
   const selectedPartLines = Array.isArray(selectedPayment.partLines) ? selectedPayment.partLines : [];
@@ -435,13 +523,33 @@ const AdminDashboard = () => {
     activeStaff: staff.filter(s => s.status === "Available").length,
   };
 
+  const adminPendingApprovalCount = bookings.filter((b) => ["Pending", "On Hold"].includes(b.status)).length;
+  const adminPaymentPendingCount = bookings.filter(
+    (b) => b.status === "Completed" && (!b.payment || b.payment.status !== "Paid")
+  ).length;
+
+  const handleAdminNotificationNavigate = () => {
+    if (adminPendingApprovalCount > 0) {
+      setActiveTab("bookings");
+      setFilterStatus("Pending");
+      showMessage("Pending bookings require action", "error");
+      return;
+    }
+    if (adminPaymentPendingCount > 0) {
+      setActiveTab("payments");
+      showMessage("Pending payments require attention", "error");
+      return;
+    }
+    showMessage("No pending work right now", "success");
+  };
+
   const commonProps = {
     dark, textPrimary, textSecondary, ICONS, cardClass, badgeFn, inputClass,
     stats, bookings, users, staff, loading, setActiveTab,
     handleUpdateStatus, handleAssignStaff, handleDeleteBooking,
     setMapModal, ICONS, Icon, activeTab,
     filterStatus, setFilterStatus, filteredBookings,
-    selectedBooking, setSelectedBooking, selectedUser, setSelectedUser
+    selectedBooking, setSelectedBooking, selectedBookingReadOnly, setSelectedBookingReadOnly, selectedUser, setSelectedUser
   };
 
   return (
@@ -466,6 +574,18 @@ const AdminDashboard = () => {
             <h1 className={`text-lg font-bold ${textPrimary}`}>Admin Dashboard</h1>
           </div>
           <div className="flex items-center gap-4">
+            <button
+              onClick={handleAdminNotificationNavigate}
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all bg-white/5 border border-white/10 text-slate-400 hover:text-white relative"
+            >
+              <Icon path={ICONS.bell} className="w-4 h-4" />
+              {(adminPendingApprovalCount > 0 || adminPaymentPendingCount > 0) && (
+                <span
+                  className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full"
+                  style={{ background: "#EF4444", boxShadow: "0 0 8px rgba(239,68,68,0.5)" }}
+                />
+              )}
+            </button>
             <button onClick={() => setDark(!dark)} className="w-9 h-9 rounded-xl flex items-center justify-center transition-all bg-white/5 border border-white/10 text-slate-400 hover:text-white">
               <Icon path={dark ? ICONS.sun : ICONS.moon} className="w-4 h-4" />
             </button>
@@ -547,7 +667,7 @@ const AdminDashboard = () => {
       {/* ── Booking Details Modal ── */}
       {selectedBooking && (activeTab === "bookings" || activeTab === "payments") && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/80 animate-fadeIn" onClick={() => { setSelectedBooking(null); setSelectedTechnician(""); }} />
+          <div className="absolute inset-0 bg-black/80 animate-fadeIn" onClick={() => { setSelectedBooking(null); setSelectedBookingReadOnly(false); setSelectedTechnician(""); }} />
           <div className={`relative z-10 w-full max-w-2xl max-h-[92vh] rounded-3xl overflow-hidden animate-fadeInUp ${dark ? "glass-dark" : "bg-white shadow-2xl"}`}>
              <div className="p-8 max-h-[92vh] overflow-y-auto">
                <div className="flex justify-between items-start mb-6">
@@ -555,7 +675,7 @@ const AdminDashboard = () => {
                    <h3 className="text-2xl font-bold text-white mb-1">Booking Details</h3>
                    <p className="text-sm text-slate-500">ID: {selectedBooking.id}</p>
                  </div>
-                 <button onClick={() => { setSelectedBooking(null); setSelectedTechnician(""); }} className="text-slate-500 hover:text-white transition-colors">
+                 <button onClick={() => { setSelectedBooking(null); setSelectedBookingReadOnly(false); setSelectedTechnician(""); }} className="text-slate-500 hover:text-white transition-colors">
                    <Icon path={ICONS.close} className="w-6 h-6" />
                  </button>
                </div>
@@ -757,52 +877,80 @@ const AdminDashboard = () => {
                {/* Admin Actions */}
                <div className="border-t border-white/10 pt-6">
                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Update Management</div>
-                 <div className="flex flex-wrap gap-2">
-                    {[
-                      { label: "Confirm", value: "Accepted" },
-                      { label: "Reject", value: "Rejected" }
-                    ].map(st => (
-                      <button key={st.value} onClick={() => handleUpdateStatus(selectedBooking.id, st.value)}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
-                          selectedBooking.status === st.value ? "bg-white text-black" : "bg-white/5 text-slate-400 hover:bg-white/10"
-                        }`}>
-                        {st.label}
-                      </button>
-                    ))}
-                    <button onClick={() => handleDeleteBooking(selectedBooking.id)}
-                      className="ml-auto px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all border border-red-500/20">
-                      Delete Booking
-                    </button>
-                 </div>
-
-                 {/* Assignment */}
-                 <div className="mt-6">
-                    <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">Assign Technician</label>
-                    {staff.filter(s => s.status === "Available").length > 0 ? (
-                      <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/30">
-                        <select 
-                          className={`w-full ${inputClass} text-sm px-4 py-3 mb-3`}
-                          onChange={(e) => {
-                            if (e.target.value) {
-                              handleAssignStaff(selectedBooking.id, e.target.value);
-                              setSelectedTechnician("");
-                            }
-                          }}
-                          value={selectedTechnician}
+                 {isModalReadOnly ? (
+                   <div className="p-4 rounded-2xl bg-blue-500/10 border border-blue-500/20">
+                     <p className="text-xs text-blue-300 font-semibold">
+                       {isLiveWorkingReadOnly
+                         ? "Live working booking is locked. Only view is allowed."
+                         : "View-only mode is active. You can only view booking details."}
+                     </p>
+                   </div>
+                 ) : (
+                   <>
+                     <div className="flex flex-wrap gap-2">
+                        <button
+                          onClick={handleConfirmBooking}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            ["Accepted", "Assigned"].includes(selectedBooking.status)
+                              ? "bg-white text-black"
+                              : "bg-white/5 text-slate-400 hover:bg-white/10"
+                          }`}
                         >
-                          <option value="">Choose available technician...</option>
-                          {staff.filter(s => s.status === "Available").map(s => (
-                            <option key={s.id} value={s.id}>{s.name} ({s.specialization})</option>
-                          ))}
-                        </select>
-                        <p className="text-xs text-green-400 font-semibold">✓ Staff is available. Select a technician to assign this task.</p>
-                      </div>
-                    ) : (
-                      <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/30">
-                        <p className="text-xs text-orange-400 font-semibold">⚠ No staff available at the moment. Please try again later.</p>
-                      </div>
-                    )}
-                 </div>
+                          Confirm
+                        </button>
+                        <button onClick={() => handleUpdateStatus(selectedBooking.id, "Rejected")}
+                          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                            selectedBooking.status === "Rejected" ? "bg-white text-black" : "bg-white/5 text-slate-400 hover:bg-white/10"
+                          }`}>
+                          Reject
+                        </button>
+                        <button onClick={() => handleDeleteBooking(selectedBooking.id)}
+                          className="ml-auto px-4 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-500 rounded-xl text-xs font-bold transition-all border border-red-500/20">
+                          Delete Booking
+                        </button>
+                     </div>
+
+                     {/* Assignment */}
+                     <div className="mt-6">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest block mb-3">Assign Technician</label>
+                        {staff.filter(s => s.status === "Available").length > 0 ? (
+                          <div className="p-4 rounded-2xl bg-green-500/10 border border-green-500/30">
+                            <select 
+                              className={`w-full ${inputClass} text-sm px-4 py-3 mb-3`}
+                              onChange={(e) => setSelectedTechnician(e.target.value)}
+                              value={selectedTechnician}
+                            >
+                              <option value="">Choose available technician...</option>
+                              {staff.filter(s => s.status === "Available").map(s => (
+                                <option key={s.id} value={s.id}>{s.name} ({s.specialization})</option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={handleConfirmBooking}
+                              disabled={!selectedTechnician || loading}
+                              className="w-full py-2.5 rounded-xl text-xs font-bold text-white transition-all disabled:opacity-50"
+                              style={{ background: 'linear-gradient(135deg, #166534, #22C55E)' }}
+                            >
+                              {loading ? "Assigning..." : "Assign Task"}
+                            </button>
+                            <p className="text-xs text-green-400 font-semibold">✓ Staff is available. Select a technician to assign this task.</p>
+                          </div>
+                        ) : (
+                          <div className="p-4 rounded-2xl bg-orange-500/10 border border-orange-500/30">
+                            <p className="text-xs text-orange-400 font-semibold">⚠ No staff available at the moment. Please try again later.</p>
+                            <button
+                              onClick={() => handleUpdateStatus(selectedBooking.id, "On Hold")}
+                              disabled={loading || selectedBooking.status === "On Hold"}
+                              className="mt-3 px-3 py-2 rounded-lg text-xs font-bold text-white transition-all disabled:opacity-50"
+                              style={{ background: 'linear-gradient(135deg, #B45309, #F59E0B)' }}
+                            >
+                              {selectedBooking.status === "On Hold" ? "Already On Hold" : "Put On Hold"}
+                            </button>
+                          </div>
+                        )}
+                     </div>
+                   </>
+                 )}
                </div>
              </div>
           </div>
@@ -821,6 +969,7 @@ const AdminDashboard = () => {
         cardClass={cardClass}
         setActiveTab={setActiveTab}
         setSelectedBooking={setSelectedBooking}
+        setSelectedBookingReadOnly={setSelectedBookingReadOnly}
       />
     </div>
   );

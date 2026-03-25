@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo, useState } from 'react';
 import { Icon } from './Shared';
 
 const MyBookingsTab = (props) => {
@@ -19,7 +19,55 @@ const MyBookingsTab = (props) => {
     handleGeneratePayment,
     handleMakePayment,
     openReminderModal,
+    bookingFilterStatus,
+    setBookingFilterStatus,
   } = props;
+  const [timeSortMode, setTimeSortMode] = useState("upcoming");
+
+  const parseBookingDateTime = (booking) => {
+    const date = booking.serviceDate || booking.createdAt;
+    if (!date) return 0;
+
+    const startTime = (booking.serviceTime || "").split("-")[0]?.trim() || "00:00";
+    const parsed = new Date(`${date} ${startTime}`);
+    const ts = parsed.getTime();
+
+    if (!Number.isNaN(ts)) return ts;
+    const createdTs = new Date(booking.createdAt || date).getTime();
+    return Number.isNaN(createdTs) ? 0 : createdTs;
+  };
+
+  const getTimeVariant = (timestamp) => {
+    const d = new Date(timestamp);
+    if (Number.isNaN(d.getTime())) return "Scheduled";
+
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const bookingDay = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const diffDays = Math.round((bookingDay - today) / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Tomorrow";
+    if (diffDays > 1) return `In ${diffDays} days`;
+    if (diffDays === -1) return "Yesterday";
+    return `${Math.abs(diffDays)} days ago`;
+  };
+
+  const visibleBookings = bookingFilterStatus && bookingFilterStatus !== "All"
+    ? bookings.filter((b) => b.status === bookingFilterStatus)
+    : bookings;
+
+  const sortedBookings = useMemo(() => {
+    const list = [...visibleBookings];
+    list.sort((a, b) => {
+      const aTime = parseBookingDateTime(a);
+      const bTime = parseBookingDateTime(b);
+
+      if (timeSortMode === "recent") return bTime - aTime;
+      return aTime - bTime;
+    });
+    return list;
+  }, [visibleBookings, timeSortMode]);
 
   return (
     <>
@@ -29,34 +77,78 @@ const MyBookingsTab = (props) => {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-bold text-white">My Bookings</h2>
-              <p className="text-sm" style={{ color: '#6B7A90' }}>{bookings.length} total bookings</p>
+              <p className="text-sm" style={{ color: '#6B7A90' }}>
+                {sortedBookings.length} {bookingFilterStatus && bookingFilterStatus !== "All" ? `${bookingFilterStatus.toLowerCase()} bookings` : 'total bookings'}
+              </p>
             </div>
-            <button onClick={() => setActiveTab("book")} className="btn-primary flex items-center gap-2 py-2.5 px-4 text-sm">
-              <Icon path={ICONS.plus} className="w-4 h-4" /> New Booking
-            </button>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center rounded-lg overflow-hidden"
+                style={{ border: '1px solid rgba(37,99,235,0.2)' }}>
+                <button
+                  onClick={() => setTimeSortMode("upcoming")}
+                  className="px-3 py-2 text-xs font-semibold"
+                  style={timeSortMode === "upcoming"
+                    ? { background: 'rgba(37,99,235,0.2)', color: '#93C5FD' }
+                    : { background: 'rgba(15,21,32,0.9)', color: '#6B7A90' }}
+                >
+                  Upcoming First
+                </button>
+                <button
+                  onClick={() => setTimeSortMode("recent")}
+                  className="px-3 py-2 text-xs font-semibold"
+                  style={timeSortMode === "recent"
+                    ? { background: 'rgba(37,99,235,0.2)', color: '#93C5FD' }
+                    : { background: 'rgba(15,21,32,0.9)', color: '#6B7A90' }}
+                >
+                  Recent First
+                </button>
+              </div>
+              {bookingFilterStatus && bookingFilterStatus !== "All" && (
+                <button
+                  onClick={() => setBookingFilterStatus && setBookingFilterStatus("All")}
+                  className="px-3 py-2 rounded-lg text-xs font-semibold"
+                  style={{ background: 'rgba(37,99,235,0.08)', border: '1px solid rgba(37,99,235,0.2)', color: '#60A5FA' }}
+                >
+                  Clear Filter
+                </button>
+              )}
+              <button onClick={() => setActiveTab("book")} className="btn-primary flex items-center gap-2 py-2.5 px-4 text-sm">
+                <Icon path={ICONS.plus} className="w-4 h-4" /> New Booking
+              </button>
+            </div>
           </div>
 
-          {bookings.length === 0 ? (
+          {sortedBookings.length === 0 ? (
             <div className="p-16 text-center rounded-2xl"
               style={{ background: '#111827', border: '1px solid rgba(255,255,255,0.06)', boxShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4"
                 style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.15)' }}>
                 <Icon path={ICONS.bookings} className="w-8 h-8 text-green-400" />
               </div>
-              <h3 className="font-semibold mb-2 text-white">No bookings yet</h3>
-              <p className="text-sm mb-4" style={{ color: '#6B7A90' }}>Book your first service slot</p>
-              <button onClick={() => setActiveTab("book")} className="btn-primary py-2.5 px-6 text-sm">Book Now</button>
+              <h3 className="font-semibold mb-2 text-white">No bookings found</h3>
+              <p className="text-sm mb-4" style={{ color: '#6B7A90' }}>
+                {bookingFilterStatus && bookingFilterStatus !== "All"
+                  ? `No ${bookingFilterStatus.toLowerCase()} bookings at the moment`
+                  : 'Book your first service slot'}
+              </p>
+              {bookingFilterStatus && bookingFilterStatus !== "All" ? (
+                <button onClick={() => setBookingFilterStatus && setBookingFilterStatus("All")} className="btn-primary py-2.5 px-6 text-sm">Show All</button>
+              ) : (
+                <button onClick={() => setActiveTab("book")} className="btn-primary py-2.5 px-6 text-sm">Book Now</button>
+              )}
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {bookings.map(b => {
+            <div className="space-y-4">
+              {sortedBookings.map((b, idx) => {
                 const statusColorMap = {
                   Pending: "#FBBF24", Accepted: "#22C55E", Rejected: "#F87171",
                   Assigned: "#3B82F6", "In Progress": "#A78BFA", Completed: "#34D399"
                 };
                 const statusColor = statusColorMap[b.status] || "#FBBF24";
+                const bookingTs = parseBookingDateTime(b);
+                const timeVariant = getTimeVariant(bookingTs);
                 return (
-                  <div key={b.id} className="rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1"
+                  <div key={b.id} className="rounded-2xl overflow-hidden"
                     style={{
                       background: '#111827',
                       border: '1px solid rgba(255,255,255,0.06)',
@@ -69,12 +161,22 @@ const MyBookingsTab = (props) => {
                     <div className="p-5">
                       {/* Top row */}
                       <div className="flex items-start justify-between mb-4">
-                        <div className="font-mono font-bold text-sm px-2.5 py-1 rounded-lg"
-                          style={{
-                            background: '#0F1520',
-                            border: '1px solid rgba(255,255,255,0.06)',
-                            color: '#60A5FA',
-                          }}>{b.vehicleNumber}</div>
+                        <div className="flex items-center gap-2">
+                          <div className="text-xs font-bold px-2 py-1 rounded-md"
+                            style={{
+                              background: 'rgba(37,99,235,0.12)',
+                              border: '1px solid rgba(37,99,235,0.2)',
+                              color: '#93C5FD',
+                            }}>
+                            #{idx + 1}
+                          </div>
+                          <div className="font-mono font-bold text-sm px-2.5 py-1 rounded-lg"
+                            style={{
+                              background: '#0F1520',
+                              border: '1px solid rgba(255,255,255,0.06)',
+                              color: '#60A5FA',
+                            }}>{b.vehicleNumber}</div>
+                        </div>
                         <span className={badgeFn(b.status)}>{b.status}</span>
                       </div>
 
@@ -85,6 +187,10 @@ const MyBookingsTab = (props) => {
                         </div>
                         <div className="flex items-center gap-2 text-xs" style={{ color: '#6B7A90' }}>
                           <Icon path={ICONS.clock} className="w-3.5 h-3.5" /> {b.serviceTime}
+                        </div>
+                        <div className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md"
+                          style={{ background: 'rgba(34,197,94,0.08)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.18)' }}>
+                          <Icon path={ICONS.lightning} className="w-3 h-3" /> {timeVariant}
                         </div>
                       </div>
 

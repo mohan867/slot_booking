@@ -34,6 +34,9 @@ const BookServiceTab = (props) => {
                   className={`${inputClass} w-full px-4 text-sm`}
                   value={formData.vehicleNumber}
                   onChange={handleInputChange}
+                  maxLength={10}
+                  pattern="[A-Za-z]{2}[0-9]{2}[A-Za-z]{2}[0-9]{4}"
+                  title="Format: TN01AB1234"
                   required disabled={loading}
                 />
                 <label htmlFor="vehicleNumber" className={`floating-label ${labelClass}`}>
@@ -124,12 +127,8 @@ const BookServiceTab = (props) => {
                     <div className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: '#6B7A90' }}>Time Slot</div>
                     <div className="grid grid-cols-2 gap-1.5">
                       {availableSlots.map((slot, i) => {
-                        if (i >= availableSlots.length - 1) return null;
+                        const timeRange = slot.time;
 
-                        const nextSlot = availableSlots[i + 1];
-                        const timeRange = `${slot.time} - ${nextSlot.time}`;
-                        
-                        // A slot is unavailable if the START time of the range is booked.
                         const isFull = !slot.isAvailable;
                         const isSelected = formData.serviceTime === timeRange;
 
@@ -203,7 +202,7 @@ const BookServiceTab = (props) => {
                       onClick={() => setFormData(p => ({
                         ...p,
                         doorstepDelivery: !p.doorstepDelivery,
-                        ...(!p.doorstepDelivery ? {} : { pickupLocation: null, doorstepCharge: 0, distanceKm: 0 })
+                        ...(!p.doorstepDelivery ? {} : { pickupAddress: "", pickupLocation: null, doorstepCharge: 0, distanceKm: 0 })
                       }))}
                       className={`w-12 h-6 rounded-full flex items-center transition-colors p-1 ${formData.doorstepDelivery ? 'bg-blue-600 justify-end' : 'bg-gray-700 justify-start'}`}
                     >

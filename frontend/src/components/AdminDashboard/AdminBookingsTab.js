@@ -3,7 +3,7 @@ import { Icon, ICONS } from '../../utils/icons';
 import { StatCard } from '../UserDashboard/Shared';
 
 const AdminBookingsTab = (props) => {
-  const { dark, textPrimary, textSecondary, badgeFn, stats, bookings, setActiveTab, setFilterStatus, filteredBookings, uniqueUsers, cardClass, setSelectedBooking, setSelectedUser, filterChip, filterStatus, loading, fetchBookings } = props;
+  const { dark, textPrimary, textSecondary, badgeFn, stats, bookings, setActiveTab, setFilterStatus, filteredBookings, uniqueUsers, cardClass, setSelectedBooking, setSelectedBookingReadOnly, setSelectedUser, filterChip, filterStatus, loading, fetchBookings } = props;
 
   return (
     <>
@@ -75,7 +75,7 @@ const AdminBookingsTab = (props) => {
                       </thead>
                       <tbody>
                         {filteredBookings.map((b, idx) => (
-                          <tr key={b.id} onClick={() => { setActiveTab('bookings'); setSelectedBooking(b); }}
+                          <tr key={b.id} onClick={() => { setActiveTab('bookings'); if (setSelectedBookingReadOnly) setSelectedBookingReadOnly(false); setSelectedBooking(b); }}
                             className="cursor-pointer" style={{ transition: 'background 0.15s' }}>
                             <td className="font-mono text-xs" style={{ color: '#3d4a5c' }}>
                               #{(idx + 1).toString().padStart(3, "0")}
@@ -138,6 +138,7 @@ const AdminBookingsTab = (props) => {
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setActiveTab('bookings');
+                                  if (setSelectedBookingReadOnly) setSelectedBookingReadOnly(false);
                                   setSelectedBooking(b);
                                 }}
                                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ml-auto"

@@ -12,7 +12,15 @@ const statusColors = {
   "On Leave": { bg: "rgba(239,68,68,0.1)", color: "#FCA5A5", border: "rgba(239,68,68,0.3)" },
 };
 
-const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiveTab }) => {
+const ACTIVE_SERVICE_STATUSES = ["Assigned", "Accepted", "In Progress"];
+
+const ACTIVITY_STATUS_COLORS = {
+  "Assigned": { bg: "rgba(59,130,246,0.12)", color: "#60A5FA", border: "rgba(59,130,246,0.25)" },
+  "Accepted": { bg: "rgba(34,197,94,0.12)", color: "#4ADE80", border: "rgba(34,197,94,0.25)" },
+  "In Progress": { bg: "rgba(249,115,22,0.12)", color: "#FB923C", border: "rgba(249,115,22,0.25)" },
+};
+
+const AdminStaffTab = ({ dark, cardClass, staff, bookings = [], activeTab, inputClass, setActiveTab, setSelectedBooking, setSelectedBookingReadOnly }) => {
   const [loading, setLoading] = useState(false);
   const [showForm, setShowForm] = useState(false);
   const [editingStaff, setEditingStaff] = useState(null);
@@ -88,6 +96,38 @@ const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiv
 
   const specializations = ["Engine Specialist", "Brake Specialist", "Tire Specialist", "Oil Change", "General Mechanic", "Electrical", "Battery Specialist"];
 
+  const getCurrentActivityBooking = (staffMember) => {
+    const staffUid = staffMember.id || staffMember.uid;
+    if (!staffUid) return null;
+
+    const activeBookings = bookings
+      .filter((b) => {
+        const assignedUid = b.staffId?._id || b.staffId?.uid || b.staffId?.id;
+        return assignedUid === staffUid && ACTIVE_SERVICE_STATUSES.includes(b.status);
+      })
+      .sort((a, b) => {
+        const priority = { "In Progress": 3, "Accepted": 2, "Assigned": 1 };
+        const byPriority = (priority[b.status] || 0) - (priority[a.status] || 0);
+        if (byPriority !== 0) return byPriority;
+        return new Date(b.updatedAt || b.createdAt || 0) - new Date(a.updatedAt || a.createdAt || 0);
+      });
+
+    return activeBookings[0] || null;
+  };
+
+  const activeStaffQueue = staff
+    .map((s) => ({
+      staff: s,
+      booking: getCurrentActivityBooking(s),
+    }))
+    .filter((item) => Boolean(item.booking))
+    .sort((a, b) => {
+      const priority = { "In Progress": 3, "Accepted": 2, "Assigned": 1 };
+      const byPriority = (priority[b.booking.status] || 0) - (priority[a.booking.status] || 0);
+      if (byPriority !== 0) return byPriority;
+      return new Date(b.booking.updatedAt || b.booking.createdAt || 0) - new Date(a.booking.updatedAt || a.booking.createdAt || 0);
+    });
+
   return (
     <div className="page-transition">
       {/* Header */}
@@ -127,6 +167,67 @@ const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiv
         ))}
       </div>
 
+      {/* Live Activity Queue */}
+      <div className="mb-6 rounded-2xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <div className="flex items-center justify-between mb-3">
+          <div>
+            <div className="text-sm font-semibold" style={{ color: '#c4d4e4' }}>Live Activity</div>
+            <div className="text-xs" style={{ color: '#5a6a7a' }}>Currently working staff and active bookings</div>
+          </div>
+          <div className="text-xs px-2.5 py-1 rounded-full font-semibold"
+            style={{ background: 'rgba(34,197,94,0.12)', color: '#4ADE80', border: '1px solid rgba(34,197,94,0.25)' }}>
+            {activeStaffQueue.length} Active
+          </div>
+        </div>
+
+        {activeStaffQueue.length === 0 ? (
+          <div className="text-xs italic py-3" style={{ color: '#6B7280' }}>No staff are actively servicing right now.</div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            {activeStaffQueue.map(({ staff: s, booking: b }) => {
+              const activityStyle = ACTIVITY_STATUS_COLORS[b.status] || ACTIVITY_STATUS_COLORS.Assigned;
+              return (
+                <div key={`live-${s.id || s.uid}-${b.id}`} className="rounded-xl p-3"
+                  style={{ background: 'rgba(15,21,32,0.9)', border: '1px solid rgba(59,130,246,0.18)' }}>
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                        style={{ background: 'linear-gradient(135deg, #1E40AF, #3B82F6)' }}>
+                        {(s.name || '?')[0].toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate" style={{ color: '#c4d4e4' }}>{s.name}</div>
+                        <div className="text-[11px] truncate" style={{ color: '#6B7280' }}>{s.specialization || 'General'}</div>
+                      </div>
+                    </div>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                      style={{ background: activityStyle.bg, color: activityStyle.color, border: `1px solid ${activityStyle.border}` }}>
+                      {b.status}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between gap-3 text-xs">
+                    <div className="min-w-0">
+                      <div className="font-mono font-semibold truncate" style={{ color: '#93C5FD' }}>{b.vehicleNumber || 'N/A'}</div>
+                      <div style={{ color: '#6B7280' }}>{b.serviceDate || '-'} {b.serviceTime ? `· ${b.serviceTime}` : ''}</div>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setActiveTab('bookings');
+                        if (typeof setSelectedBooking === 'function') setSelectedBooking(b);
+                      }}
+                      className="px-2.5 py-1.5 rounded-lg text-xs font-semibold flex-shrink-0"
+                      style={{ background: 'rgba(16,185,129,0.12)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.25)' }}>
+                      Track
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
       {/* Search */}
       <div className="mb-6 relative">
         <Icon path={ICONS.search} className="w-4 h-4 absolute left-4 top-1/2 -translate-y-1/2" style={{ color: '#4a5668' }} />
@@ -158,7 +259,7 @@ const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiv
               <table className="w-full">
                 <thead>
                   <tr style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    {["Staff ID", "Name", "Phone", "Specialization", "Status", "Actions"].map(h => (
+                    {["Staff ID", "Name", "Phone", "Specialization", "Status", "Current Activity", "Actions"].map(h => (
                       <th key={h} className="text-left text-xs font-semibold uppercase tracking-wider px-5 py-4"
                         style={{ color: '#5a6a7a' }}>{h}</th>
                     ))}
@@ -167,6 +268,8 @@ const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiv
                 <tbody>
                   {filtered.map((s, i) => {
                     const sc = statusColors[s.status] || statusColors["Available"];
+                    const currentBooking = getCurrentActivityBooking(s);
+                    const activityStyle = ACTIVITY_STATUS_COLORS[currentBooking?.status] || ACTIVITY_STATUS_COLORS["Assigned"];
                     return (
                       <tr key={s.id}
                         style={{ borderBottom: i < filtered.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none" }}
@@ -198,7 +301,42 @@ const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiv
                           </span>
                         </td>
                         <td className="px-5 py-4">
+                          {currentBooking ? (
+                            <div className="space-y-1.5">
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs px-2 py-1 rounded-md"
+                                  style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', color: '#93C5FD' }}>
+                                  {currentBooking.vehicleNumber || 'N/A'}
+                                </span>
+                                <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                                  style={{ background: activityStyle.bg, color: activityStyle.color, border: `1px solid ${activityStyle.border}` }}>
+                                  {currentBooking.status}
+                                </span>
+                              </div>
+                              <div className="text-[11px]" style={{ color: '#6B7280' }}>
+                                {currentBooking.serviceDate || '-'} {currentBooking.serviceTime ? `· ${currentBooking.serviceTime}` : ''}
+                              </div>
+                            </div>
+                          ) : (
+                            <span className="text-xs italic" style={{ color: '#4a5668' }}>No active service</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-4">
                           <div className="flex items-center gap-2">
+                            {currentBooking && (
+                              <button
+                                onClick={() => {
+                                  setActiveTab('bookings');
+                                  if (typeof setSelectedBookingReadOnly === 'function') setSelectedBookingReadOnly(true);
+                                  if (typeof setSelectedBooking === 'function') setSelectedBooking(currentBooking);
+                                }}
+                                className="px-2.5 h-8 rounded-lg flex items-center justify-center transition-all text-xs font-semibold"
+                                style={{ background: 'rgba(16,185,129,0.12)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.25)' }}
+                                title="Track Booking"
+                              >
+                                Track
+                              </button>
+                            )}
                             <button onClick={() => openEditForm(s)}
                               className="w-8 h-8 rounded-lg flex items-center justify-center transition-all"
                               style={{ background: "rgba(59,130,246,0.1)", color: "#60A5FA" }}
@@ -225,6 +363,8 @@ const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiv
           <div className="md:hidden grid gap-4">
             {filtered.map(s => {
               const sc = statusColors[s.status] || statusColors["Available"];
+              const currentBooking = getCurrentActivityBooking(s);
+              const activityStyle = ACTIVITY_STATUS_COLORS[currentBooking?.status] || ACTIVITY_STATUS_COLORS["Assigned"];
               return (
                 <div key={s.id} className={`${cardClass} p-5`}>
                   <div className="flex items-center gap-3 mb-3">
@@ -252,6 +392,36 @@ const AdminStaffTab = ({ dark, cardClass, staff, activeTab, inputClass, setActiv
                       <Icon path={ICONS.wrench} className="w-3.5 h-3.5" style={{ color: '#60A5FA' }} />
                       <span style={{ color: '#60A5FA' }}>{s.specialization}</span>
                     </div>
+                    {currentBooking ? (
+                      <div className="mt-2 p-3 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="font-mono text-xs px-2 py-1 rounded-md"
+                            style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.18)', color: '#93C5FD' }}>
+                            {currentBooking.vehicleNumber || 'N/A'}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
+                            style={{ background: activityStyle.bg, color: activityStyle.color, border: `1px solid ${activityStyle.border}` }}>
+                            {currentBooking.status}
+                          </span>
+                        </div>
+                        <div className="text-[11px]" style={{ color: '#6B7280' }}>
+                          {currentBooking.serviceDate || '-'} {currentBooking.serviceTime ? `· ${currentBooking.serviceTime}` : ''}
+                        </div>
+                        <button
+                          onClick={() => {
+                            setActiveTab('bookings');
+                            if (typeof setSelectedBookingReadOnly === 'function') setSelectedBookingReadOnly(true);
+                            if (typeof setSelectedBooking === 'function') setSelectedBooking(currentBooking);
+                          }}
+                          className="mt-2 w-full py-2 rounded-lg text-xs font-semibold"
+                          style={{ background: 'rgba(16,185,129,0.12)', color: '#6EE7B7', border: '1px solid rgba(16,185,129,0.25)' }}
+                        >
+                          Track Current Booking
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="text-xs italic mt-1" style={{ color: '#4a5668' }}>No active service</div>
+                    )}
                   </div>
                   <div className="flex gap-2">
                     <button onClick={() => openEditForm(s)}

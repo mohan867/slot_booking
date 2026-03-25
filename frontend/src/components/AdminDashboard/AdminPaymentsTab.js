@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Icon, ICONS } from '../../utils/icons';
 
 const AdminPaymentsTab = (props) => {
-  const { activeTab, bookings, cardClass, setSelectedBooking } = props;
+  const { activeTab, bookings, cardClass, setSelectedBooking, setSelectedBookingReadOnly } = props;
   const [selectedCustomerId, setSelectedCustomerId] = useState(null);
 
   const paymentBookings = bookings.filter((b) => b.status === 'Completed' || b.payment);
@@ -89,7 +89,7 @@ const AdminPaymentsTab = (props) => {
                     </td>
                     <td className="text-right">
                       <button
-                        onClick={() => setSelectedBooking(b)}
+                        onClick={() => { if (setSelectedBookingReadOnly) setSelectedBookingReadOnly(false); setSelectedBooking(b); }}
                         className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all"
                         style={b.payment?.status === 'Paid'
                           ? { background: 'rgba(59,130,246,0.08)', color: '#93C5FD', border: '1px solid rgba(59,130,246,0.2)' }
@@ -189,6 +189,7 @@ const AdminPaymentsTab = (props) => {
                           <div className="mt-3 flex justify-end">
                             <button
                               onClick={() => {
+                                if (setSelectedBookingReadOnly) setSelectedBookingReadOnly(false);
                                 setSelectedBooking(b);
                                 setSelectedCustomerId(null);
                               }}

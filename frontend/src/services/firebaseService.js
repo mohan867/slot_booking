@@ -239,10 +239,22 @@ export const getAllBookings = async () => {
 
 /** Update booking status (admin) */
 export const updateBookingStatus = async (bookingId, status) => {
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  const bookingSnap = await get(bookingRef);
+  if (bookingSnap.exists() && bookingSnap.val().status === "Completed") {
+    throw new Error("Completed booking is read-only");
+  }
+  const booking = bookingSnap.exists() ? bookingSnap.val() : null;
+
   await update(ref(db, `bookings/${bookingId}`), {
     status,
     updatedAt: new Date().toISOString(),
   });
+
+  const staffUid = booking?.staffId?._id || booking?.staffId?.uid || booking?.staffId?.id;
+  if (staffUid) {
+    await refreshStaffAvailability(staffUid);
+  }
 };
 
 /** Accept booking */
@@ -261,19 +273,39 @@ export const rescheduleBooking = async (bookingId, { serviceDate, serviceTime })
 
 /** Cancel booking (user) */
 export const cancelBooking = async (bookingId) => {
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  const bookingSnap = await get(bookingRef);
+  const booking = bookingSnap.exists() ? bookingSnap.val() : null;
+
   await update(ref(db, `bookings/${bookingId}`), {
     status: "Cancelled",
     updatedAt: new Date().toISOString(),
   });
+
+  const staffUid = booking?.staffId?._id || booking?.staffId?.uid || booking?.staffId?.id;
+  if (staffUid) {
+    await refreshStaffAvailability(staffUid);
+  }
 };
 
 /** Delete booking (admin) */
 export const deleteBooking = async (bookingId) => {
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  const bookingSnap = await get(bookingRef);
+  if (bookingSnap.exists() && bookingSnap.val().status === "Completed") {
+    throw new Error("Completed booking cannot be deleted");
+  }
   await remove(ref(db, `bookings/${bookingId}`));
 };
 
 /** Assign staff to booking */
 export const assignStaffToBooking = async (bookingId, staffId) => {
+  const bookingRef = ref(db, `bookings/${bookingId}`);
+  const bookingSnap = await get(bookingRef);
+  if (bookingSnap.exists() && bookingSnap.val().status === "Completed") {
+    throw new Error("Completed booking is read-only");
+  }
+
   const staffSnap = await get(ref(db, `staff/${staffId}`));
   if (!staffSnap.exists()) throw new Error("Staff not found");
   const staffData = staffSnap.val();
@@ -281,6 +313,33 @@ export const assignStaffToBooking = async (bookingId, staffId) => {
   await update(ref(db, `bookings/${bookingId}`), {
     staffId: { ...staffData, id: staffId }, // ensure id is included
     status: "Assigned",
+    updatedAt: new Date().toISOString(),
+  });
+
+  await refreshStaffAvailability(staffId);
+};
+
+/** Keep staff status in sync with active assigned work */
+const refreshStaffAvailability = async (staffUid) => {
+  if (!staffUid) return;
+
+  const bookingsSnap = await get(ref(db, "bookings"));
+  const allBookings = bookingsSnap.exists() ? Object.values(bookingsSnap.val()) : [];
+
+  const hasActiveWork = allBookings.some((b) => {
+    const assignedUid = b.staffId?._id || b.staffId?.uid || b.staffId?.id;
+    if (assignedUid !== staffUid) return false;
+
+    return ["Assigned", "Accepted", "In Progress"].includes(b.status);
+  });
+
+  const nextStatus = hasActiveWork ? "Busy" : "Available";
+  await update(ref(db, `staff/${staffUid}`), {
+    status: nextStatus,
+    updatedAt: new Date().toISOString(),
+  });
+  await update(ref(db, `users/${staffUid}`), {
+    status: nextStatus,
     updatedAt: new Date().toISOString(),
   });
 };
@@ -298,16 +357,20 @@ export const generateBookingPayment = async (bookingId) => {
 
   const laborCharge = Number(booking.payment?.laborCharge ?? 500);
   const partsCharge = Number(booking.payment?.partsCharge ?? 0);
-  const doorstepCharge = Number(booking.doorstepCharge || 0);
+  const doorstepCharge = Number(booking.payment?.doorstepCharge ?? booking.doorstepCharge ?? 0);
+  const serviceCost = Number(booking.payment?.serviceCost ?? 0);
+  const tipAmount = Number(booking.payment?.tipAmount ?? 0);
   const discount = Number(booking.payment?.discount ?? 0);
   const tax = Number(booking.payment?.tax ?? 0);
-  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tax - discount);
+  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tipAmount + tax - discount);
 
   const payment = {
     invoiceNo: booking.payment?.invoiceNo || `INV-${Date.now()}`,
     laborCharge,
     partsCharge,
     doorstepCharge,
+    serviceCost,
+    tipAmount,
     discount,
     tax,
     totalAmount,
@@ -341,23 +404,27 @@ export const generateBookingPayment = async (bookingId) => {
 
 /** Admin edit/update booking payment */
 export const updateBookingPayment = async (bookingId, paymentInput) => {
-  const laborCharge = Number(paymentInput.laborCharge || 0);
-  const partsCharge = Number(paymentInput.partsCharge || 0);
-  const doorstepCharge = Number(paymentInput.doorstepCharge || 0);
-  const discount = Number(paymentInput.discount || 0);
-  const tax = Number(paymentInput.tax || 0);
-  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tax - discount);
-
   const bookingRef = ref(db, `bookings/${bookingId}`);
   const snap = await get(bookingRef);
   if (!snap.exists()) throw new Error("Booking not found");
 
   const prevPayment = snap.val().payment || {};
+  const laborCharge = Number(paymentInput.laborCharge || 0);
+  const partsCharge = Number(paymentInput.partsCharge || 0);
+  const doorstepCharge = Number(paymentInput.doorstepCharge || 0);
+  const discount = Number(paymentInput.discount || 0);
+  const tax = Number(paymentInput.tax || 0);
+  const serviceCost = Number(paymentInput.serviceCost ?? prevPayment.serviceCost ?? 0);
+  const tipAmount = Number(paymentInput.tipAmount ?? prevPayment.tipAmount ?? 0);
+  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tipAmount + tax - discount);
+
   const payment = {
     invoiceNo: paymentInput.invoiceNo || prevPayment.invoiceNo || `INV-${Date.now()}`,
     laborCharge,
     partsCharge,
     doorstepCharge,
+    serviceCost,
+    tipAmount,
     discount,
     tax,
     totalAmount,
@@ -404,12 +471,16 @@ export const staffGenerateBookingPayment = async (bookingId, paymentInput) => {
   const issueTotal = issueLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
   const partsTotal = partLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
 
-  const laborCharge = issueLines.length > 0 ? issueTotal : Number(paymentInput.laborCharge || 0);
+  const serviceCost = Number(paymentInput.serviceCost || 0);
+  const tipAmount = Number(paymentInput.tipAmount || 0);
+  const laborCharge = issueLines.length > 0
+    ? issueTotal + serviceCost
+    : Number(paymentInput.laborCharge || 0) + serviceCost;
   const partsCharge = partLines.length > 0 ? partsTotal : Number(paymentInput.partsCharge || 0);
   const doorstepCharge = Number(paymentInput.doorstepCharge || 0);
   const discount = Number(paymentInput.discount || 0);
   const tax = Number(paymentInput.tax || 0);
-  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tax - discount);
+  const totalAmount = Math.max(0, laborCharge + partsCharge + doorstepCharge + tipAmount + tax - discount);
 
   const prevPayment = booking.payment || {};
   const payment = {
@@ -417,6 +488,8 @@ export const staffGenerateBookingPayment = async (bookingId, paymentInput) => {
     laborCharge,
     partsCharge,
     doorstepCharge,
+    serviceCost,
+    tipAmount,
     discount,
     tax,
     totalAmount,
@@ -497,11 +570,14 @@ export const makeBookingPayment = async (bookingId) => {
 
 /** Get available time slots for a date */
 export const getAvailableSlots = async (date) => {
-  const allSlots = [
-    "09:00 AM", "09:30 AM", "10:00 AM", "10:30 AM",
-    "11:00 AM", "11:30 AM", "12:00 PM", "12:30 PM",
-    "02:00 PM", "02:30 PM", "03:00 PM", "03:30 PM",
-    "04:00 PM", "04:30 PM", "05:00 PM",
+  const oneHourSlots = [
+    "09:00 AM - 10:00 AM",
+    "10:00 AM - 11:00 AM",
+    "11:00 AM - 12:00 PM",
+    "12:00 PM - 01:00 PM",
+    "02:00 PM - 03:00 PM",
+    "03:00 PM - 04:00 PM",
+    "04:00 PM - 05:00 PM",
   ];
   const snap = await get(ref(db, "bookings"));
   const booked = new Set();
@@ -512,7 +588,7 @@ export const getAvailableSlots = async (date) => {
       }
     });
   }
-  return allSlots.map((time) => ({
+  return oneHourSlots.map((time) => ({
     time,
     isAvailable: !booked.has(time),
     available: booked.has(time) ? 0 : 1,
@@ -579,7 +655,7 @@ export const createStaff = async ({ name, email, password, phone, specialization
     email,
     phone: phone || "",
     specialization: specialization || "General",
-    status: "active",
+    status: "Available",
     assignedJobs: 0,
     completedJobs: 0,
     createdAt: new Date().toISOString(),
@@ -653,6 +729,15 @@ export const updateBookingProgress = async (bookingId, status) => {
     status,
     updatedAt: new Date().toISOString(),
   });
+
+  const bookingSnapAfterUpdate = await get(bookingRef);
+  if (bookingSnapAfterUpdate.exists()) {
+    const bookingAfterUpdate = bookingSnapAfterUpdate.val();
+    const assignedUid = bookingAfterUpdate?.staffId?._id || bookingAfterUpdate?.staffId?.uid || bookingAfterUpdate?.staffId?.id;
+    if (assignedUid) {
+      await refreshStaffAvailability(assignedUid);
+    }
+  }
 
   if (status !== "In Progress") return;
 

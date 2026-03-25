@@ -2,7 +2,12 @@ import React from 'react';
 import { Icon, StatCard, DonutChart, MiniBarChart } from './Shared';
 
 const DashboardTab = (props) => {
-  const { dark, textPrimary, textSecondary, ICONS, cardClass, badgeFn, stats, bookings, userData, setActiveTab, activeTab } = props;
+  const { dark, textPrimary, textSecondary, ICONS, cardClass, badgeFn, stats, bookings, userData, setActiveTab, setBookingFilterStatus, activeTab } = props;
+
+  const goToBookings = (status) => {
+    if (typeof setBookingFilterStatus === 'function') setBookingFilterStatus(status);
+    setActiveTab("bookings");
+  };
 
   // Donut data
   const acceptRate = stats.total > 0 ? Math.round((stats.accepted / stats.total) * 100) : 0;
@@ -39,14 +44,22 @@ const DashboardTab = (props) => {
 
           {/* Stats */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <StatCard label="Total Bookings" value={stats.total} sub="All time"
-              icon={ICONS.bookings} delay={0} dark={dark} accentColor="#3B82F6" />
-            <StatCard label="Pending" value={stats.pending} sub="Needs action"
-              icon={ICONS.clock} delay={80} dark={dark} accentColor="#FBBF24" />
-            <StatCard label="Accepted" value={stats.accepted} sub="Confirmed slots"
-              icon={ICONS.check} delay={160} dark={dark} accentColor="#22C55E" />
-            <StatCard label="Rejected" value={stats.rejected} sub="Declined"
-              icon={ICONS.x} delay={240} dark={dark} accentColor="#F87171" />
+            <div className="cursor-pointer" onClick={() => goToBookings("All")}>
+              <StatCard label="Total Bookings" value={stats.total} sub="All time"
+                icon={ICONS.bookings} delay={0} dark={dark} accentColor="#3B82F6" />
+            </div>
+            <div className="cursor-pointer" onClick={() => goToBookings("Pending")}>
+              <StatCard label="Pending" value={stats.pending} sub="Needs action"
+                icon={ICONS.clock} delay={80} dark={dark} accentColor="#FBBF24" />
+            </div>
+            <div className="cursor-pointer" onClick={() => goToBookings("Accepted")}>
+              <StatCard label="Accepted" value={stats.accepted} sub="Confirmed slots"
+                icon={ICONS.check} delay={160} dark={dark} accentColor="#22C55E" />
+            </div>
+            <div className="cursor-pointer" onClick={() => goToBookings("Rejected")}>
+              <StatCard label="Rejected" value={stats.rejected} sub="Declined"
+                icon={ICONS.x} delay={240} dark={dark} accentColor="#F87171" />
+            </div>
           </div>
 
           {/* Charts + Actions Row */}

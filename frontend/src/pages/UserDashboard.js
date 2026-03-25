@@ -25,8 +25,8 @@ import ReminderModal from '../components/UserDashboard/ReminderModal';
 import FeedbackTab from '../components/UserDashboard/FeedbackTab';
 
 
-/* ── Shop Location (RMK Garage) ─── */
-const SHOP_LOCATION = { lat: 13.0827, lng: 80.2707, name: "RMK Garage" };
+/* ── Shop Location (Map Landmark) ─── */
+const SHOP_LOCATION = { lat: 11.2432461, lng: 77.5062681, name: "2/125, Vijayamangalam Rd, Vijayapuri" };
 
 /* ── Haversine Distance (km) ─── */
 const calcDistance = (lat1, lon1, lat2, lon2) => {
@@ -239,13 +239,14 @@ const UserDashboard = () => {
   const [message, setMessage] = useState({ text: "", type: "" });
   const [paymentLoadingId, setPaymentLoadingId] = useState("");
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [bookingFilterStatus, setBookingFilterStatus] = useState("All");
   const [userData, setUserData] = useState(null);
   const [dark, setDark] = useState(true);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [formData, setFormData] = useState({
     vehicleNumber: "", serviceDate: "", serviceTime: "", issue: "", issueCategories: [], doorstepDelivery: false,
-    pickupLocation: null, doorstepCharge: 0, distanceKm: 0
+    pickupAddress: "", pickupLocation: null, doorstepCharge: 0, distanceKm: 0
   });
 
   const [rescheduleModal, setRescheduleModal] = useState({ isOpen: false, booking: null, newDate: "", newTime: "" });
@@ -257,6 +258,9 @@ const UserDashboard = () => {
   const markerRef = useRef(null);
   const routeLineRef = useRef(null);
   const shopMarkerRef = useRef(null);
+  const pickupAddressRef = useRef("");
+  const skipAddressGeocodeRef = useRef(false);
+  const lastAddressQueryRef = useRef("");
   const [mapReady, setMapReady] = useState(false);
   const [locatingUser, setLocatingUser] = useState(false);
   const notificationsReadyRef = useRef(false);
@@ -270,11 +274,28 @@ const UserDashboard = () => {
     } catch { return `${lat.toFixed(5)}, ${lng.toFixed(5)}`; }
   }, []);
 
+  const forwardGeocode = useCallback(async (address) => {
+    try {
+      const q = encodeURIComponent(address);
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${q}&limit=1&addressdetails=1`);
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) return null;
+      const top = data[0];
+      return {
+        lat: parseFloat(top.lat),
+        lng: parseFloat(top.lon),
+        address: top.display_name || address,
+      };
+    } catch {
+      return null;
+    }
+  }, []);
+
   /* ── Set pickup location on map ── */
-  const setPickupOnMap = useCallback(async (lat, lng) => {
+  const setPickupOnMap = useCallback(async (lat, lng, options = {}) => {
     if (!mapInstanceRef.current) return;
     const map = mapInstanceRef.current;
-    const addr = await reverseGeocode(lat, lng);
+    const addr = options.address || await reverseGeocode(lat, lng);
     const dist = calcDistance(SHOP_LOCATION.lat, SHOP_LOCATION.lng, lat, lng);
     const charge = calcDoorstepCharge(dist);
 
@@ -300,13 +321,52 @@ const UserDashboard = () => {
     const bounds = L.latLngBounds([[SHOP_LOCATION.lat, SHOP_LOCATION.lng], [lat, lng]]);
     map.fitBounds(bounds, { padding: [40, 40] });
 
+    // Prevent loop: programmatic pickupAddress updates should not trigger address geocoding again.
+    skipAddressGeocodeRef.current = true;
+    lastAddressQueryRef.current = addr.trim().toLowerCase();
     setFormData(p => ({
       ...p,
+      pickupAddress: addr,
       pickupLocation: { lat, lng, address: addr },
       distanceKm: Math.round(dist * 10) / 10,
       doorstepCharge: charge
     }));
   }, [reverseGeocode]);
+
+  useEffect(() => {
+    pickupAddressRef.current = formData.pickupAddress || "";
+  }, [formData.pickupAddress]);
+
+  useEffect(() => {
+    if (!formData.doorstepDelivery || !mapReady || !mapInstanceRef.current) return;
+
+    const address = (formData.pickupAddress || "").trim();
+
+    if (skipAddressGeocodeRef.current) {
+      skipAddressGeocodeRef.current = false;
+      return;
+    }
+
+    if (!address) {
+      setFormData(p => ({ ...p, pickupLocation: null, distanceKm: 0, doorstepCharge: 0 }));
+      return;
+    }
+
+    if (address.length < 6) return;
+
+    const normalized = address.toLowerCase();
+    if (normalized === lastAddressQueryRef.current && formData.pickupLocation) return;
+
+    const timer = setTimeout(async () => {
+      const result = await forwardGeocode(address);
+      if (!result) return;
+      if ((pickupAddressRef.current || "").trim() !== address) return;
+      lastAddressQueryRef.current = normalized;
+      setPickupOnMap(result.lat, result.lng, { address: result.address });
+    }, 700);
+
+    return () => clearTimeout(timer);
+  }, [formData.pickupAddress, formData.doorstepDelivery, formData.pickupLocation, mapReady, forwardGeocode, setPickupOnMap]);
 
   /* ── Initialize / destroy map ── */
   useEffect(() => {
@@ -357,23 +417,68 @@ const UserDashboard = () => {
   }, [formData.doorstepDelivery, setPickupOnMap]);
 
   /* ── Get user's current location ── */
-  const handleUseMyLocation = () => {
+  const handleUseMyLocation = async () => {
     if (!navigator.geolocation) {
       showMessage('Geolocation is not supported by your browser', 'error');
       return;
     }
+    if (!mapInstanceRef.current) {
+      showMessage('Map is still loading. Please try again in a moment.', 'error');
+      return;
+    }
+
+    const getBestCurrentPosition = () => new Promise((resolve, reject) => {
+      let bestPos = null;
+      let settled = false;
+      const startedAt = Date.now();
+      const targetAccuracyM = 35;
+
+      const finalize = (position, errorMsg) => {
+        if (settled) return;
+        settled = true;
+        try { navigator.geolocation.clearWatch(watchId); } catch { }
+        clearTimeout(timeoutId);
+
+        if (position) resolve(position);
+        else reject(new Error(errorMsg || 'Unable to determine current location'));
+      };
+
+      const watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          if (!bestPos || pos.coords.accuracy < bestPos.coords.accuracy) {
+            bestPos = pos;
+          }
+
+          const isAccurateEnough = Number(pos.coords.accuracy || 9999) <= targetAccuracyM;
+          const waitedLongEnough = Date.now() - startedAt > 7000;
+          if (isAccurateEnough || waitedLongEnough) {
+            finalize(bestPos || pos);
+          }
+        },
+        () => {
+          finalize(bestPos, 'Unable to get your location. Please allow location access or pick on the map.');
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+      );
+
+      const timeoutId = setTimeout(() => {
+        finalize(bestPos, 'Location request timed out. Please try again.');
+      }, 15000);
+    });
+
     setLocatingUser(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setPickupOnMap(pos.coords.latitude, pos.coords.longitude);
-        setLocatingUser(false);
-      },
-      (err) => {
-        showMessage('Unable to get your location. Please allow location access or pick on the map.', 'error');
-        setLocatingUser(false);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    try {
+      const pos = await getBestCurrentPosition();
+      await setPickupOnMap(pos.coords.latitude, pos.coords.longitude);
+      const accuracy = Math.round(Number(pos.coords.accuracy || 0));
+      if (accuracy > 0) {
+        showMessage(`Live location captured (accuracy ~${accuracy}m)`, 'success');
+      }
+    } catch (err) {
+      showMessage(err.message || 'Unable to get your location. Please allow location access or pick on the map.', 'error');
+    } finally {
+      setLocatingUser(false);
+    }
   };
 
   useEffect(() => { 
@@ -427,7 +532,15 @@ const UserDashboard = () => {
   };
 
   const handleInputChange = (e) => {
-    setFormData(p => ({ ...p, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    if (name === "vehicleNumber") {
+      const cleaned = value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10);
+      const partialFormat = /^([A-Z]{0,2}|[A-Z]{2}[0-9]{0,2}|[A-Z]{2}[0-9]{2}[A-Z]{0,2}|[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{0,4})$/;
+      if (!partialFormat.test(cleaned)) return;
+      setFormData(p => ({ ...p, vehicleNumber: cleaned }));
+    } else {
+      setFormData(p => ({ ...p, [name]: value }));
+    }
     if (message.text) setMessage({ text: "", type: "" });
   };
 
@@ -453,8 +566,12 @@ const UserDashboard = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault(); setLoading(true);
+    const vehicleNumberRegex = /^[A-Z]{2}[0-9]{2}[A-Z]{2}[0-9]{4}$/;
     if (!formData.vehicleNumber || !formData.serviceDate || !formData.serviceTime) {
       showMessage("Please fill in all required fields", "error"); setLoading(false); return;
+    }
+    if (!vehicleNumberRegex.test(formData.vehicleNumber)) {
+      showMessage("Vehicle number must be in format: TN01AB1234", "error"); setLoading(false); return;
     }
     if (!formData.issue && formData.issueCategories.length === 0) {
       showMessage("Please describe the issue or select issue categories", "error"); setLoading(false); return;
@@ -479,7 +596,7 @@ const UserDashboard = () => {
       
       await createBooking(payload);
       showMessage("Booking created successfully! 🎉", "success");
-      setFormData({ vehicleNumber: "", serviceDate: "", serviceTime: "", issue: "", issueCategories: [], doorstepDelivery: false, pickupLocation: null, doorstepCharge: 0, distanceKm: 0 });
+      setFormData({ vehicleNumber: "", serviceDate: "", serviceTime: "", issue: "", issueCategories: [], doorstepDelivery: false, pickupAddress: "", pickupLocation: null, doorstepCharge: 0, distanceKm: 0 });
       setAvailableSlots([]);
       setTimeout(() => setActiveTab("bookings"), 1500);
     } catch (err) {
@@ -524,14 +641,75 @@ const UserDashboard = () => {
     }
   };
 
+  const loadRazorpay = () => {
+    return new Promise((resolve) => {
+      if (window.Razorpay) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleMakePayment = async (bookingId) => {
-    if (!window.confirm("Confirm payment for this booking?")) return;
+    const booking = bookings.find((b) => b.id === bookingId);
+    if (!booking) return;
+
+    const totalAmount = Number(booking.payment?.totalAmount || 0);
+    if (totalAmount <= 0) {
+      showMessage("Invalid amount for payment", "error");
+      return;
+    }
+
     setPaymentLoadingId(bookingId);
     try {
-      await makeBookingPayment(bookingId);
-      showMessage("Payment completed successfully!", "success");
+      const res = await loadRazorpay();
+      if (!res) {
+        showMessage("Razorpay SDK failed to load. Check your connection.", "error");
+        setPaymentLoadingId("");
+        return;
+      }
+
+      // Initialize Razorpay Client-Side Test Mode Checkout
+      const options = {
+        key: "rzp_test_SPOrR8y66LGYgr", // User's Razorpay test key
+        amount: Math.round(totalAmount * 100).toString(), // amount in paise
+        currency: "INR",
+        name: "RMK Bikes Service",
+        description: `Payment for booking ${booking.vehicleNumber}`,
+        handler: async function (response) {
+          try {
+            // Confirm payment on success
+            await makeBookingPayment(bookingId);
+            showMessage(`Payment successful! ID: ${response.razorpay_payment_id}`, "success");
+          } catch (err) {
+            showMessage("Database update failed after payment.", "error");
+          }
+        },
+        prefill: {
+          name: userData?.name || userData?.email || "User",
+          email: userData?.email || "user@example.com",
+          contact: userData?.phone || booking.phone || "9999999999"
+        },
+        theme: {
+          color: "#4f46e5" // Indigo 600
+        }
+      };
+
+      const paymentObject = new window.Razorpay(options);
+      
+      paymentObject.on("payment.failed", function (response) {
+        showMessage(`Payment Failed: ${response.error.description}`, "error");
+      });
+
+      paymentObject.open();
+
     } catch (err) {
-      showMessage(err.message || "Payment failed", "error");
+      showMessage(err.message || "Payment initiation failed", "error");
     } finally {
       setPaymentLoadingId("");
     }
@@ -571,6 +749,26 @@ const UserDashboard = () => {
     onHold: bookings.filter(b => b.status === "On Hold").length,
   };
 
+  const userPendingBookingsCount = bookings.filter((b) => ["Pending", "On Hold"].includes(b.status)).length;
+  const userPaymentPendingCount = bookings.filter(
+    (b) => b.status === "Completed" && (!b.payment || b.payment.status !== "Paid")
+  ).length;
+
+  const handleNotificationNavigate = () => {
+    if (userPendingBookingsCount > 0) {
+      setBookingFilterStatus("Pending");
+      setActiveTab("bookings");
+      showMessage("You have pending booking actions", "error");
+      return;
+    }
+    if (userPaymentPendingCount > 0) {
+      setActiveTab("payments");
+      showMessage("You have pending payments", "error");
+      return;
+    }
+    showMessage("No pending work right now", "success");
+  };
+
   /* ── Styles ── */
   const appBg = dark ? "bg-app-dark" : "bg-app-light";
   const textPrimary = dark ? "text-slate-100" : "text-slate-900";
@@ -582,7 +780,7 @@ const UserDashboard = () => {
 
   const commonProps = {
     dark, textPrimary, textSecondary, ICONS, cardClass, badgeFn,
-    stats, bookings, userData, setActiveTab,
+    stats, bookings, userData, setActiveTab, bookingFilterStatus, setBookingFilterStatus,
     formData, handleInputChange, handleCheckboxChange, availableSlots, handleSlotSelect,
     handleSubmit, loading, setFormData, handleUseMyLocation, locatingUser,
     mapContainerRef, SHOP_LOCATION, ISSUE_CATEGORIES, getMinDate, inputClass, labelClass,
@@ -634,9 +832,9 @@ const UserDashboard = () => {
           </div>
           <div className="flex items-center gap-3">
             {/* Notification Bell */}
-            <button className="notification-bell">
+            <button className="notification-bell" onClick={handleNotificationNavigate}>
               <Icon path={ICONS.bell} className="w-5 h-5" />
-              {bookings.filter(b => b.status === "Pending").length > 0 && <span className="notification-dot" />}
+              {(userPendingBookingsCount > 0 || userPaymentPendingCount > 0) && <span className="notification-dot" />}
             </button>
             {/* Theme Toggle */}
             <button

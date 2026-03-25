@@ -13,6 +13,7 @@ const UserDetailModal = (props) => {
     cardClass,
     setActiveTab,
     setSelectedBooking,
+    setSelectedBookingReadOnly,
   } = props;
 
   if (!selectedUser) return null;
@@ -198,6 +199,7 @@ const UserDetailModal = (props) => {
                       <div className="mt-3">
                         <button
                           onClick={() => {
+                            if (setSelectedBookingReadOnly) setSelectedBookingReadOnly(false);
                             if (setSelectedBooking) setSelectedBooking(booking);
                             if (setActiveTab) setActiveTab('bookings');
                             onClose();

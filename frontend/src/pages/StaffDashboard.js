@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { 
   logoutUser, 
   getCurrentUserProfile, 
@@ -31,7 +31,7 @@ const ICONS = {
   chevronRight: "M9 5l7 7-7 7",
 };
 
-const SHOP_LOCATION = { lat: 13.0827, lng: 80.2707 };
+const SHOP_LOCATION = { lat: 11.2432461, lng: 77.5062681 };
 
 const createIssueLine = (name = "", amount = 0) => ({
   name,
@@ -70,12 +70,16 @@ const StaffDashboard = () => {
   const [actionLoading, setActionLoading] = useState(null);
   const [filterStatus, setFilterStatus] = useState("All");
   const [selectedTask, setSelectedTask] = useState(null);
+  const [openPaymentSection, setOpenPaymentSection] = useState(false);
+  const paymentSectionRef = useRef(null);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentDraft, setPaymentDraft] = useState({
     invoiceNo: "",
     laborCharge: 0,
     partsCharge: 0,
     doorstepCharge: 0,
+    serviceCost: 0,
+    tipAmount: 0,
     discount: 0,
     tax: 0,
     notes: "",
@@ -161,7 +165,9 @@ const StaffDashboard = () => {
       invoiceNo: p.invoiceNo || "",
       laborCharge: Number(p.laborCharge || 0),
       partsCharge: Number(p.partsCharge || 0),
-      doorstepCharge: Number(p.doorstepCharge || selectedTask.doorstepCharge || 0),
+      doorstepCharge: Number(selectedTask.doorstepCharge || 0),
+      serviceCost: Number(p.serviceCost || 0),
+      tipAmount: Number(p.tipAmount || 0),
       discount: Number(p.discount || 0),
       tax: Number(p.tax || 0),
       notes: p.notes || "",
@@ -173,6 +179,15 @@ const StaffDashboard = () => {
         : [createPartLine("", 1, 0)],
     });
   }, [selectedTask]);
+
+  useEffect(() => {
+    if (!selectedTask || !openPaymentSection || selectedTask.status !== "Completed") return;
+    const timer = setTimeout(() => {
+      paymentSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setOpenPaymentSection(false);
+    }, 120);
+    return () => clearTimeout(timer);
+  }, [selectedTask, openPaymentSection]);
 
   const updateIssueLine = (idx, key, value) => {
     setPaymentDraft((prev) => ({
@@ -211,7 +226,7 @@ const StaffDashboard = () => {
   );
   const grandTotal = Math.max(
     0,
-    issueTotal + partsTotal + Number(paymentDraft.doorstepCharge || 0) + Number(paymentDraft.tax || 0) - Number(paymentDraft.discount || 0)
+    issueTotal + Number(paymentDraft.serviceCost || 0) + partsTotal + Number(paymentDraft.doorstepCharge || 0) + Number(paymentDraft.tipAmount || 0) + Number(paymentDraft.tax || 0) - Number(paymentDraft.discount || 0)
   );
 
   const handleGeneratePayment = async () => {
@@ -220,9 +235,11 @@ const StaffDashboard = () => {
     try {
       const saved = await staffGenerateBookingPayment(selectedTask.id, {
         invoiceNo: paymentDraft.invoiceNo,
-        laborCharge: issueTotal,
+        laborCharge: issueTotal + Number(paymentDraft.serviceCost || 0),
         partsCharge: partsTotal,
         doorstepCharge: Number(paymentDraft.doorstepCharge || 0),
+        serviceCost: Number(paymentDraft.serviceCost || 0),
+        tipAmount: Number(paymentDraft.tipAmount || 0),
         discount: Number(paymentDraft.discount || 0),
         tax: Number(paymentDraft.tax || 0),
         notes: paymentDraft.notes || "",
@@ -278,15 +295,25 @@ const StaffDashboard = () => {
         {/* Stats Cards */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Assigned", val: stats.assigned, color: "#3B82F6", icon: ICONS.clock },
-            { label: "Accepted", val: stats.accepted, color: "#4ADE80", icon: ICONS.check },
-            { label: "In Progress", val: stats.inProgress, color: "#C084FC", icon: ICONS.lightning },
-            { label: "Completed", val: stats.completed, color: "#6EE7B7", icon: ICONS.check },
+            { label: "Assigned", val: stats.assigned, color: "#3B82F6", icon: ICONS.clock, filter: "Assigned" },
+            { label: "Accepted", val: stats.accepted, color: "#4ADE80", icon: ICONS.check, filter: "Accepted" },
+            { label: "In Progress", val: stats.inProgress, color: "#C084FC", icon: ICONS.lightning, filter: "In Progress" },
+            { label: "Completed", val: stats.completed, color: "#6EE7B7", icon: ICONS.check, filter: "Completed" },
           ].map(s => (
-            <div key={s.label} className="p-5 rounded-2xl" style={{
-              background: "rgba(255,255,255,0.03)",
-              border: "1px solid rgba(59,130,246,0.08)"
-            }}>
+            <button key={s.label}
+              type="button"
+              onClick={() => setFilterStatus(s.filter)}
+              className="p-5 rounded-2xl text-left transition-all cursor-pointer"
+              style={filterStatus === s.filter
+                ? {
+                    background: "rgba(59,130,246,0.12)",
+                    border: "1px solid rgba(59,130,246,0.28)",
+                    boxShadow: "0 6px 16px rgba(59,130,246,0.18)",
+                  }
+                : {
+                    background: "rgba(255,255,255,0.03)",
+                    border: "1px solid rgba(59,130,246,0.08)",
+                  }}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${s.color}15` }}>
                   <Icon path={s.icon} className="w-4 h-4" style={{ color: s.color }} />
@@ -294,7 +321,7 @@ const StaffDashboard = () => {
               </div>
               <div className="text-2xl font-black text-white">{s.val}</div>
               <div className="text-xs" style={{ color: "#6B7280" }}>{s.label}</div>
-            </div>
+            </button>
           ))}
         </div>
 
@@ -446,6 +473,20 @@ const StaffDashboard = () => {
                       </div>
                     )}
 
+                    {task.status === "Completed" && (
+                      <button
+                        onClick={() => {
+                          setSelectedTask(task);
+                          setOpenPaymentSection(true);
+                        }}
+                        className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.01]"
+                        style={{ background: "linear-gradient(135deg, #1D4ED8, #3B82F6)" }}
+                      >
+                        <Icon path={ICONS.receipt} className="w-4 h-4" />
+                        {task.payment ? "View Payment" : "Generate Payment"}
+                      </button>
+                    )}
+
                     {task.status === "Completed" && task.payment && (
                       <div className="mt-3 flex items-center justify-between rounded-xl px-3 py-2"
                         style={{ background: "rgba(59,130,246,0.08)", border: "1px solid rgba(59,130,246,0.15)" }}>
@@ -560,7 +601,7 @@ const StaffDashboard = () => {
               )}
 
               {selectedTask.status === "Completed" && (
-                <div>
+                <div ref={paymentSectionRef}>
                   <div className="text-xs font-semibold uppercase tracking-widest mb-3" style={{ color: "#6B7280" }}>Payment Calculator</div>
                   <div className="rounded-xl p-4 space-y-3" style={{
                     background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)"
@@ -579,16 +620,18 @@ const StaffDashboard = () => {
                         <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Doorstep Amount</div>
                         <input
                           type="number"
-                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-slate-300 cursor-not-allowed"
                           placeholder="Doorstep Amount"
                           value={paymentDraft.doorstepCharge}
-                          onChange={(e) => setPaymentDraft(prev => ({ ...prev, doorstepCharge: e.target.value }))}
+                          readOnly
+                          disabled
                         />
                       </div>
                       <div>
                         <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Discount</div>
                         <input
                           type="number"
+                          min="0"
                           className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
                           placeholder="Discount"
                           value={paymentDraft.discount}
@@ -599,6 +642,7 @@ const StaffDashboard = () => {
                         <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Tax</div>
                         <input
                           type="number"
+                          min="0"
                           className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
                           placeholder="Tax"
                           value={paymentDraft.tax}
@@ -685,6 +729,30 @@ const StaffDashboard = () => {
                         ))}
                       </div>
                     </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Service Cost</div>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                          placeholder="Service Cost"
+                          value={paymentDraft.serviceCost}
+                          onChange={(e) => setPaymentDraft(prev => ({ ...prev, serviceCost: e.target.value }))}
+                        />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider mb-1" style={{ color: "#93C5FD" }}>Tip (Optional)</div>
+                        <input
+                          type="number"
+                          min="0"
+                          className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white"
+                          placeholder="Tip Amount"
+                          value={paymentDraft.tipAmount}
+                          onChange={(e) => setPaymentDraft(prev => ({ ...prev, tipAmount: e.target.value }))}
+                        />
+                      </div>
+                    </div>
                     <textarea
                       className="w-full px-3 py-2 rounded-lg text-sm bg-white/5 border border-white/10 text-white min-h-[64px]"
                       placeholder="Service notes for invoice"
@@ -694,8 +762,12 @@ const StaffDashboard = () => {
                     <div className="flex items-center justify-between">
                       <div className="text-sm font-semibold" style={{ color: "#93C5FD" }}>
                         <div>Issue Total: Rs {issueTotal.toFixed(2)}</div>
+                        <div>Service Cost: Rs {Number(paymentDraft.serviceCost || 0).toFixed(2)}</div>
                         <div>Parts Total: Rs {partsTotal.toFixed(2)}</div>
                         <div>Doorstep Amount: Rs {Number(paymentDraft.doorstepCharge || 0).toFixed(2)}</div>
+                        <div>Tip: Rs {Number(paymentDraft.tipAmount || 0).toFixed(2)}</div>
+                        <div>Tax: Rs {Number(paymentDraft.tax || 0).toFixed(2)}</div>
+                        <div>Discount: Rs {Number(paymentDraft.discount || 0).toFixed(2)}</div>
                         <div>Total: Rs {grandTotal.toFixed(2)}</div>
                       </div>
                       <button
